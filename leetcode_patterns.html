@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeetCode Patterns Checklist</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; padding: 24px; }
+  h1 { font-size: 18px; color: #a78bfa; margin-bottom: 20px; letter-spacing: 0.5px; }
+  .pattern { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  .pattern-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; cursor: pointer; user-select: none; }
+  .pattern-header:hover { background: #1f2235; }
+  .pattern-title { font-size: 14px; font-weight: 600; color: #c4b5fd; }
+  .pattern-num { font-size: 12px; color: #6366f1; margin-right: 8px; }
+  .progress { font-size: 11px; color: #6b7280; background: #0f1117; padding: 2px 8px; border-radius: 99px; }
+  .chevron { color: #6b7280; font-size: 12px; transition: transform 0.2s; }
+  .pattern.open .chevron { transform: rotate(180deg); }
+  .pattern-body { display: none; padding: 0 16px 14px; }
+  .pattern.open .pattern-body { display: block; }
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; margin: 12px 0 6px; }
+  .section-label.examples { color: #34d399; }
+  .section-label.homework { color: #f59e0b; }
+  .divider { height: 1px; background: #2a2d3a; margin: 10px 0; }
+  .item { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; }
+  .item input[type=checkbox] { margin-top: 2px; accent-color: #6366f1; width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; }
+  .item label { font-size: 13px; color: #cbd5e1; cursor: pointer; line-height: 1.4; }
+  .item input:checked + label { color: #4b5563; text-decoration: line-through; }
+  .stats-bar { height: 3px; background: #2a2d3a; border-radius: 99px; margin-top: 8px; }
+  .stats-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #a78bfa); border-radius: 99px; transition: width 0.3s; }
+  .global-progress { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  .global-progress span { font-size: 12px; color: #6b7280; }
+  .global-progress strong { font-size: 14px; color: #a78bfa; }
+</style>
+</head>
+<body>
+<h1>📋 LeetCode Patterns — 灵茶山艾府</h1>
+
+<div class="global-progress">
+  <div style="flex:1">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <span>Total Progress</span>
+      <strong id="global-text">0 / 0</strong>
+    </div>
+    <div class="stats-bar"><div class="stats-fill" id="global-fill" style="width:0%"></div></div>
+  </div>
+</div>
+
+<div id="patterns"></div>
+
+<script>
+const data = [
+  {
+    num: "01", title: "Two Pointers 1: Opposite Direction",
+    examples: ["167. Two Sum II - Input Array Is Sorted", "15. 3Sum", "11. Container With Most Water", "42. Trapping Rain Water"],
+    homework: ["2824. Count Pairs Whose Sum Is Less Than Target", "16. 3Sum Closest", "18. 4Sum", "611. Valid Triangle Number", "125. Valid Palindrome", "2105. Watering Plants II"]
+  },
+  {
+    num: "02", title: "Two Pointers 2: Opposite Direction (Advanced)",
+    examples: ["11. Container With Most Water", "42. Trapping Rain Water"],
+    homework: ["125. Valid Palindrome", "2105. Watering Plants II"]
+  },
+  {
+    num: "03", title: "Sliding Window",
+    examples: ["209. Minimum Size Subarray Sum", "3. Longest Substring Without Repeating Characters", "713. Subarray Product Less Than K"],
+    homework: ["3090. Maximum Length Substring With Two Occurrences", "2958. Length of Longest Subarray With at Most K Frequency", "2730. Find the Longest Semi-Repetitive Substring", "2779. Maximum Beauty of an Array After Applying Operation", "1004. Max Consecutive Ones III", "2962. Count Subarrays Where Max Element Appears at Least K Times", "2302. Count Subarrays With Score Less Than K", "1658. Minimum Operations to Reduce X to Zero", "1234. Replace the Substring for Balanced String", "3795. Minimum Subarray Length With Distinct Sum at Least K", "76. Minimum Window Substring"]
+  },
+  {
+    num: "04", title: "Binary Search",
+    examples: ["34. Find First and Last Position of Element in Sorted Array"],
+    homework: ["2529. Maximum Count of Positive Integer and Negative Integer", "2300. Successful Pairs of Spells and Potions", "1385. Find the Distance Value Between Two Arrays", "2080. Range Frequency Queries", "2563. Count the Number of Fair Pairs", "875. Koko Eating Bananas", "2187. Minimum Time to Complete Trips", "275. H-Index II", "2861. Maximum Number of Alloys", "2439. Minimize Maximum of Array", "2517. Maximum Tastiness of Candy Basket"]
+  },
+  {
+    num: "05", title: "Binary Search — Variants",
+    examples: ["162. Find Peak Element", "153. Find Minimum in Rotated Sorted Array", "33. Search in Rotated Sorted Array"],
+    homework: ["74. Search a 2D Matrix", "1901. Find a Peak Element II", "154. Find Minimum in Rotated Sorted Array II"]
+  },
+  {
+    num: "06", title: "Linked List — Reversal",
+    examples: ["206. Reverse Linked List", "92. Reverse Linked List II", "25. Reverse Nodes in K-Group"],
+    homework: ["24. Swap Nodes in Pairs", "445. Add Two Numbers II", "2816. Double a Number Represented as a Linked List"]
+  },
+  {
+    num: "07", title: "Linked List — Fast & Slow Pointers",
+    examples: ["876. Middle of the Linked List", "141. Linked List Cycle", "142. Linked List Cycle II", "143. Reorder List"],
+    homework: ["234. Palindrome Linked List"]
+  },
+  {
+    num: "08", title: "Linked List — Deletion",
+    examples: ["237. Delete Node in a Linked List", "19. Remove Nth Node From End of List", "83. Remove Duplicates from Sorted List", "82. Remove Duplicates from Sorted List II"],
+    homework: ["203. Remove Linked List Elements", "3217. Delete Nodes From Linked List Present in Array", "2487. Remove Nodes From Linked List"]
+  },
+  {
+    num: "09", title: "Binary Tree & Recursion — Deep Dive",
+    examples: ["104. Maximum Depth of Binary Tree"],
+    homework: ["111. Minimum Depth of Binary Tree", "404. Sum of Left Leaves", "112. Path Sum", "129. Sum Root to Leaf Numbers", "1448. Count Good Nodes in Binary Tree", "987. Vertical Order Traversal of a Binary Tree"]
+  },
+  {
+    num: "10", title: "Binary Tree & Recursion — Flexible Application",
+    examples: ["100. Same Tree", "101. Symmetric Tree", "110. Balanced Binary Tree", "199. Binary Tree Right Side View"],
+    homework: ["226. Invert Binary Tree", "617. Merge Two Binary Trees", "1026. Maximum Difference Between Node and Ancestor", "1080. Insufficient Nodes in Root-to-Leaf Paths"]
+  },
+  {
+    num: "11", title: "Binary Tree — Pre/In/Post-order Traversal",
+    examples: ["98. Validate Binary Search Tree"],
+    homework: ["938. Range Sum of BST", "2476. Closest Nodes Queries in a BST", "230. Kth Smallest Element in a BST", "1373. Maximum Sum BST in Binary Tree", "105. Construct Binary Tree from Preorder and Inorder Traversal", "106. Construct Binary Tree from Inorder and Postorder Traversal", "889. Construct Binary Tree from Preorder and Postorder Traversal", "1110. Delete Nodes and Return Forest"]
+  },
+  {
+    num: "12", title: "Binary Tree — Lowest Common Ancestor (LCA)",
+    examples: ["236. Lowest Common Ancestor of a Binary Tree", "235. Lowest Common Ancestor of a BST"],
+    homework: ["1123. Lowest Common Ancestor of Deepest Leaves"]
+  },
+  {
+    num: "13", title: "Binary Tree — BFS (Level Order)",
+    examples: ["102. Binary Tree Level Order Traversal", "103. Binary Tree Zigzag Level Order Traversal", "513. Find Bottom Left Tree Value"],
+    homework: ["107. Binary Tree Level Order Traversal II", "116. Populating Next Right Pointers in Each Node", "117. Populating Next Right Pointers in Each Node II", "2415. Reverse Odd Levels of Binary Tree", "2641. Cousins in Binary Tree II"]
+  },
+  {
+    num: "14", title: "Backtracking — Subsets",
+    examples: ["17. Letter Combinations of a Phone Number", "78. Subsets", "131. Palindrome Partitioning"],
+    homework: ["2698. Find the Punishment Number of an Integer"]
+  },
+  {
+    num: "15", title: "Backtracking — Combinations & Pruning",
+    examples: ["77. Combinations", "216. Combination Sum III", "22. Generate Parentheses"],
+    homework: ["39. Combination Sum", "93. Restore IP Addresses"]
+  },
+  {
+    num: "16", title: "Backtracking — Permutations",
+    examples: ["46. Permutations", "51. N-Queens", "52. N-Queens II"],
+    homework: ["2850. Minimum Moves to Spread Stones Over Grid"]
+  },
+  {
+    num: "17", title: "Dynamic Programming — Memoization to Tabulation",
+    examples: ["198. House Robber"],
+    homework: ["70. Climbing Stairs", "746. Min Cost Climbing Stairs", "3693. Climbing Stairs II", "377. Combination Sum IV", "2466. Count Ways to Build Good Strings", "2266. Count Number of Texts", "213. House Robber II", "64. Minimum Path Sum"]
+  },
+  {
+    num: "18", title: "Knapsack DP — 0/1 & Complete (at most / exactly / at least)",
+    examples: ["494. Target Sum", "322. Coin Change"],
+    homework: ["2915. Length of Longest Subsequence That Sums to Target", "416. Partition Equal Subset Sum", "518. Coin Change II", "279. Perfect Squares"]
+  },
+  {
+    num: "19", title: "LCS — Longest Common Subsequence",
+    examples: ["1143. Longest Common Subsequence", "72. Edit Distance"],
+    homework: ["712. Minimum ASCII Delete Sum for Two Strings", "97. Interleaving String", "1458. Max Dot Product of Two Subsequences", "1092. Shortest Common Supersequence"]
+  },
+  {
+    num: "20", title: "LIS — Longest Increasing Subsequence",
+    examples: ["300. Longest Increasing Subsequence"],
+    homework: ["2826. Sorting Three Groups", "1671. Minimum Number of Removals to Make Mountain Array", "354. Russian Doll Envelopes", "1626. Best Team With No Conflicts", "1187. Make Array Strictly Increasing"]
+  },
+  {
+    num: "21", title: "State Machine DP — Stock Trading Series",
+    examples: ["122. Best Time to Buy and Sell Stock II", "309. Best Time to Buy and Sell Stock with Cooldown", "188. Best Time to Buy and Sell Stock IV"],
+    homework: ["714. Best Time to Buy and Sell Stock with Transaction Fee", "2826. Sorting Three Groups", "2786. Visit Array Positions to Maximize Score"]
+  },
+  {
+    num: "22", title: "Interval DP",
+    examples: ["516. Longest Palindromic Subsequence", "1039. Minimum Score Triangulation of Polygon"],
+    homework: ["3472. Longest Palindromic Subsequence After at Most K Operations", "3040. Maximum Number of Operations With the Same Score II", "1771. Maximize Palindrome Length From Subsequences", "1547. Minimum Cost to Cut a Stick"]
+  },
+  {
+    num: "23", title: "Tree DP — Diameter Series",
+    examples: ["543. Diameter of Binary Tree", "124. Binary Tree Maximum Path Sum", "2246. Longest Path With Different Adjacent Characters"],
+    homework: ["687. Longest Univalue Path", "3203. Find Minimum Diameter After Merging Two Trees", "1617. Count Subtrees With Max Distance Between Cities", "2538. Difference Between Maximum and Minimum Price Sum"]
+  },
+  {
+    num: "24", title: "Tree DP — Max Independent Set",
+    examples: ["337. House Robber III"],
+    homework: ["1377. Frog Position After T Seconds", "2646. Minimize the Total Price of the Trips"]
+  },
+  {
+    num: "25", title: "Tree DP — Min Dominating Set",
+    examples: ["968. Binary Tree Cameras"],
+    homework: []
+  },
+  {
+    num: "26", title: "Monotonic Stack",
+    examples: ["739. Daily Temperatures", "42. Trapping Rain Water"],
+    homework: ["496. Next Greater Element I", "503. Next Greater Element II", "901. Online Stock Span", "1019. Next Greater Node In Linked List", "1944. Number of Visible People in a Queue", "84. Largest Rectangle in Histogram", "1793. Maximum Score of a Good Subarray", "85. Maximal Rectangle"]
+  },
+  {
+    num: "27", title: "Monotonic Deque",
+    examples: ["239. Sliding Window Maximum"],
+    homework: ["2398. Maximum Number of Robots Within Budget", "862. Shortest Subarray with Sum at Least K", "1499. Max Value of Equation", "1696. Jump Game VI", "2944. Minimum Number of Coins for Fruits"]
+  }
+];
+
+function makeId(patternNum, type, i) {
+  return `p${patternNum}-${type}-${i}`;
+}
+
+function buildPatterns() {
+  const container = document.getElementById('patterns');
+  data.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'pattern';
+    div.id = `pattern-${p.num}`;
+
+    const total = p.examples.length + p.homework.length;
+    div.innerHTML = `
+      <div class="pattern-header" onclick="togglePattern('${p.num}')">
+        <div style="display:flex;align-items:center">
+          <span class="pattern-num">${p.num}.</span>
+          <span class="pattern-title">${p.title}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="progress" id="prog-${p.num}">0 / ${total}</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="pattern-body">
+        <div class="stats-bar"><div class="stats-fill" id="fill-${p.num}" style="width:0%"></div></div>
+        <div class="section-label examples">✦ Examples</div>
+        ${p.examples.map((q, i) => `
+          <div class="item">
+            <input type="checkbox" id="${makeId(p.num,'ex',i)}" onchange="updateProgress('${p.num}')">
+            <label for="${makeId(p.num,'ex',i)}">${q}</label>
+          </div>`).join('')}
+        ${p.homework.length > 0 ? `
+        <div class="divider"></div>
+        <div class="section-label homework">★ Homework</div>
+        ${p.homework.map((q, i) => `
+          <div class="item">
+            <input type="checkbox" id="${makeId(p.num,'hw',i)}" onchange="updateProgress('${p.num}')">
+            <label for="${makeId(p.num,'hw',i)}">${q}</label>
+          </div>`).join('')}` : ''}
+      </div>`;
+    container.appendChild(div);
+  });
+  updateGlobal();
+}
+
+function togglePattern(num) {
+  document.getElementById(`pattern-${num}`).classList.toggle('open');
+}
+
+function updateProgress(num) {
+  const p = data.find(x => x.num === num);
+  const total = p.examples.length + p.homework.length;
+  let done = 0;
+  p.examples.forEach((_, i) => { if (document.getElementById(makeId(num,'ex',i))?.checked) done++; });
+  p.homework.forEach((_, i) => { if (document.getElementById(makeId(num,'hw',i))?.checked) done++; });
+  document.getElementById(`prog-${num}`).textContent = `${done} / ${total}`;
+  document.getElementById(`fill-${num}`).style.width = total ? `${(done/total)*100}%` : '0%';
+  updateGlobal();
+}
+
+function updateGlobal() {
+  let total = 0, done = 0;
+  data.forEach(p => {
+    p.examples.forEach((_, i) => { total++; if (document.getElementById(makeId(p.num,'ex',i))?.checked) done++; });
+    p.homework.forEach((_, i) => { total++; if (document.getElementById(makeId(p.num,'hw',i))?.checked) done++; });
+  });
+  document.getElementById('global-text').textContent = `${done} / ${total}`;
+  document.getElementById('global-fill').style.width = `${(done/total)*100}%`;
+}
+
+buildPatterns();
+</script>
+</body>
+</html>
