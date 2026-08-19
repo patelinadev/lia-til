@@ -358,18 +358,20 @@ git push origin main</pre>
 
     <div class="callout me"><span class="k">Key</span><span><b>S2 needs no new deployment setup.</b> S1 already wired the Vercel pipeline — from now on, deploying any content stage just means the standard git flow: push to <code>main</code>, it auto-deploys. That's the payoff of building the walking skeleton first.</span></div>
 
-    <div class="phase"><span class="phase__k">A</span><h3>Structure — three routes</h3></div>
-    <p class="phase__note">Home stays minimal; each section gets its own page.</p>
+    <div class="phase"><span class="phase__k">A</span><h3>Structure — a hub + section routes</h3></div>
+    <p class="phase__note">Home stays minimal; each section gets its own page. Grew to four sections over S2.</p>
     <ol class="timeline">
       <li class="step" data-actor="me">
         <div class="rail"><div class="marker">1</div></div>
         <div class="card">
           <div class="tags"><span class="tag tag--me">App Router</span></div>
-          <h4>A hub that links into two sections</h4>
-          <pre class="cmd">/            <span class="c"># minimal black-screen hub → two entry cards</span>
-/leetcode    <span class="c"># pattern-based problem table</span>
-/daily-log   <span class="c"># tree-trunk day-by-day timeline</span></pre>
-          <p>Built with <code>next/link</code> navigation; all three routes <b>prerender as static</b>.</p>
+          <h4>A hub that links into four sections</h4>
+          <pre class="cmd">/              <span class="c"># minimal hub → four entry cards ("Today I Learned")</span>
+/leetcode      <span class="c"># problem table — header-dropdown filters, sort, colored topics</span>
+/daily-log     <span class="c"># tree-trunk day-by-day timeline</span>
+/applications  <span class="c"># anonymized dashboard + Monday-start submissions calendar</span>
+/system-design <span class="c"># source→chapter tree; /system-design/&lt;slug&gt; per-deck detail</span></pre>
+          <p>Built with <code>next/link</code>; every route <b>prerenders as static</b>. A subtle global footer credits "Developed by Lia".</p>
         </div>
       </li>
       <li class="step" data-actor="me">
@@ -406,6 +408,17 @@ git push origin main</pre>
             <li><b>20 curated days</b> scraped from the Obsidian daily logs, privacy-filtered.</li>
           </ul>
           <div class="callout"><span class="k">Language</span><span><b>English-only, no exceptions</b> — every field of the daily log (to-dos, summaries, and the 📝 note) is English, same as the rest of the site.</span></div>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">4</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">/applications</span><span class="tag tag--me">/system-design</span></div>
+          <h4>Two more sections added over S2</h4>
+          <ul>
+            <li><b>Applications</b> — an <b>anonymized</b> job-search dashboard (total + a Heard-back / Interviewing / Closed funnel) and a <b>Monday-start calendar</b> showing each day's submission count. Built from a local, git-ignored ledger via a generator that emits <b>only aggregate counts</b> — no company names ever reach the repo (see Privacy).</li>
+            <li><b>System Design</b> — a source→chapter <b>tree</b> (30 decks by phase); each completed deck is its own route <code>/system-design/&lt;slug&gt;</code> with a sticky <b>Google-Docs-style outline</b>. Diagrams are <b>re-drawn as theme-aware HTML</b>, not screenshots.</li>
+          </ul>
         </div>
       </li>
     </ol>
@@ -502,7 +515,8 @@ git push origin v0.2.0</pre>
       <thead><tr><th>Version</th><th>Milestone</th><th>Status</th></tr></thead>
       <tbody>
         <tr><td class="v">v0.1.0</td><td>P1 · S1 — First Deploy (Next.js + Vercel auto-deploy pipeline)</td><td>✅ Done</td></tr>
-        <tr><td class="v">v0.2.0</td><td>P1 · S2 — Section routes + LeetCode table (filter/sort/status/colored topics) + curated Daily Log</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.2.0</td><td>P1 · S2 core — section routes + LeetCode table (filter/sort/status/colored topics) + curated Daily Log</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.2.x</td><td>P1 · S2 wrap-up — anonymized Applications dashboard + calendar · System Design tree + per-deck detail pages · "Today I Learned" home + footer</td><td>✅ Done</td></tr>
       </tbody>
     </table>
   </div>
