@@ -4,31 +4,199 @@
   "updatedAt": "2026-08-19",
   "problems": [
     {
+      "id": 167,
+      "slug": "two-sum-ii-input-array-is-sorted",
+      "title": "Two Sum II - Input Array Is Sorted",
+      "topics": [
+        "Two Pointers"
+      ],
+      "ep": 1,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-12",
+      "solutionUrl": null
+    },
+    {
+      "id": 15,
+      "slug": "3sum",
+      "title": "3Sum",
+      "topics": [
+        "Two Pointers"
+      ],
+      "ep": 1,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": null,
+      "solutionUrl": null
+    },
+    {
+      "id": 2824,
+      "slug": "count-pairs-whose-sum-is-less-than-target",
+      "title": "Count Pairs Whose Sum is Less than Target",
+      "topics": [
+        "Two Pointers"
+      ],
+      "ep": 1,
+      "difficulty": "Easy",
+      "status": "First pass",
+      "date": "2026-07-16",
+      "solutionUrl": null
+    },
+    {
+      "id": 16,
+      "slug": "3sum-closest",
+      "title": "3Sum Closest",
+      "topics": [
+        "Two Pointers"
+      ],
+      "ep": 1,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-05",
+      "solutionUrl": null
+    },
+    {
+      "id": 18,
+      "slug": "4sum",
+      "title": "4Sum",
+      "topics": [
+        "Two Pointers"
+      ],
+      "ep": 1,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-05",
+      "solutionUrl": null
+    },
+    {
+      "id": 611,
+      "slug": "valid-triangle-number",
+      "title": "Valid Triangle Number",
+      "topics": [
+        "Two Pointers"
+      ],
+      "ep": 1,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-05",
+      "solutionUrl": null
+    },
+    {
+      "id": 11,
+      "slug": "container-with-most-water",
+      "title": "Container With Most Water",
+      "topics": [
+        "Two Pointers"
+      ],
+      "ep": 2,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-05",
+      "solutionUrl": null
+    },
+    {
       "id": 42,
       "slug": "trapping-rain-water",
       "title": "Trapping Rain Water",
-      "pattern": "Two Pointers",
+      "topics": [
+        "Two Pointers"
+      ],
       "ep": 2,
       "difficulty": "Hard",
+      "status": "First pass",
+      "date": "2026-08-05",
       "solutionUrl": "https://leetcode.com/problems/trapping-rain-water/solutions/8443625/lc-42-trapping-rain-water-by-l2c255-tu63/"
     },
     {
       "id": 125,
       "slug": "valid-palindrome",
       "title": "Valid Palindrome",
-      "pattern": "Two Pointers",
+      "topics": [
+        "Two Pointers"
+      ],
       "ep": 2,
       "difficulty": "Easy",
+      "status": "First pass",
+      "date": "2026-08-09",
       "solutionUrl": "https://leetcode.com/problems/valid-palindrome/solutions/8451668/two-pointers-with-in-place-skipping-by-l-rkgb/"
+    },
+    {
+      "id": 2105,
+      "slug": "watering-plants-ii",
+      "title": "Watering Plants II",
+      "topics": [
+        "Two Pointers"
+      ],
+      "ep": 2,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-09",
+      "solutionUrl": null
+    },
+    {
+      "id": 209,
+      "slug": "minimum-size-subarray-sum",
+      "title": "Minimum Size Subarray Sum",
+      "topics": [
+        "Sliding Window"
+      ],
+      "ep": 3,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-10",
+      "solutionUrl": null
+    },
+    {
+      "id": 3,
+      "slug": "longest-substring-without-repeating-characters",
+      "title": "Longest Substring Without Repeating Characters",
+      "topics": [
+        "Sliding Window"
+      ],
+      "ep": 3,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-10",
+      "solutionUrl": null
     },
     {
       "id": 713,
       "slug": "subarray-product-less-than-k",
       "title": "Subarray Product Less Than K",
-      "pattern": "Sliding Window",
+      "topics": [
+        "Sliding Window"
+      ],
       "ep": 3,
       "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-10",
       "solutionUrl": "https://leetcode.com/problems/subarray-product-less-than-k/solutions/8453659/lc-713-subarray-product-less-than-k-slid-uxpn/"
+    },
+    {
+      "id": 3090,
+      "slug": "maximum-length-substring-with-two-occurrences",
+      "title": "Maximum Length Substring With Two Occurrences",
+      "topics": [
+        "Sliding Window"
+      ],
+      "ep": 3,
+      "difficulty": "Easy",
+      "status": "First pass",
+      "date": "2026-08-11",
+      "solutionUrl": null
+    },
+    {
+      "id": 2958,
+      "slug": "length-of-longest-subarray-with-at-most-k-frequency",
+      "title": "Length of Longest Subarray With at Most K Frequency",
+      "topics": [
+        "Sliding Window"
+      ],
+      "ep": 3,
+      "difficulty": "Medium",
+      "status": "First pass",
+      "date": "2026-08-12",
+      "solutionUrl": null
     }
   ]
 }

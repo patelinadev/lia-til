@@ -1,0 +1,23 @@
+{
+  "date": "2026-08-12",
+  "week": "W33",
+  "done": [
+    "AI 项目 Day 2：实现 MVP",
+    "Backend 项目 Day 3：PostgreSQL",
+    "投递简历 15 份"
+  ],
+  "summary": null,
+  "note": null,
+  "leetcode": [
+    {
+      "id": 167,
+      "slug": "two-sum-ii-input-array-is-sorted",
+      "title": "Two Sum II - Input Array Is Sorted"
+    },
+    {
+      "id": 2958,
+      "slug": "length-of-longest-subarray-with-at-most-k-frequency",
+      "title": "Length of Longest Subarray With at Most K Frequency"
+    }
+  ]
+}

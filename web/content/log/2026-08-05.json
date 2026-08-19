@@ -1,0 +1,24 @@
+{
+  "date": "2026-08-05",
+  "week": "W32",
+  "done": [
+    "AI 项目 Day 1",
+    "Backend 项目 Day 1",
+    "0x3f 盲写确认 16 / 18 / 611 —— Ep.01 六题全清"
+  ],
+  "summary": null,
+  "note": null,
+  "leetcode": [
+    {
+      "id": 11,
+      "slug": "container-with-most-water",
+      "title": "Container With Most Water"
+    },
+    {
+      "id": 42,
+      "slug": "trapping-rain-water",
+      "title": "Trapping Rain Water",
+      "solutionUrl": "https://leetcode.com/problems/trapping-rain-water/solutions/8443625/lc-42-trapping-rain-water-by-l2c255-tu63/"
+    }
+  ]
+}

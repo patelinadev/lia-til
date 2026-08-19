@@ -1,0 +1,19 @@
+{
+  "date": "2026-04-22",
+  "week": "W17",
+  "done": [],
+  "summary": null,
+  "note": "HashMap 计数（242 Anagram）+ Top K（347 按 value 排序模板）+ 前缀/后缀乘积（238，O(n²)→O(n)）",
+  "leetcode": [
+    {
+      "id": 242,
+      "slug": "valid-anagram",
+      "title": "Valid Anagram"
+    },
+    {
+      "id": 347,
+      "slug": "top-k-frequent-elements",
+      "title": "Top K Frequent Elements"
+    }
+  ]
+}

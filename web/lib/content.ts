@@ -4,14 +4,37 @@ import leetcodeData from "@/content/leetcode.json";
 
 export type Difficulty = "Easy" | "Medium" | "Hard";
 
+export type Status =
+  | "Second pass"
+  | "First pass"
+  | "Need review"
+  | "Passed after read"
+  | "Don't understand";
+
+export type StatusCategory = "Complete" | "In Progress" | "To Do";
+
+/** Which of the 3 buckets each status belongs to. */
+export const STATUS_CATEGORY: Record<Status, StatusCategory> = {
+  "Second pass": "Complete",
+  "First pass": "In Progress",
+  "Need review": "In Progress",
+  "Passed after read": "To Do",
+  "Don't understand": "To Do",
+};
+
 export type Problem = {
   id: number;
   slug: string;
   title: string;
-  pattern: string;
+  /** Multi-select topic tags — a problem can span several (e.g. Binary Search + Stack) */
+  topics: string[];
   ep: number;
   difficulty: Difficulty;
-  solutionUrl: string;
+  status: Status;
+  /** Most recent completion date, YYYY-MM-DD; null if unknown */
+  date: string | null;
+  /** Link to Lia's own solution write-up; null if none yet */
+  solutionUrl: string | null;
 };
 
 export type LeetcodeContent = {
@@ -45,10 +68,14 @@ export type LogEntry = {
   leetcode?: LogProblem[];
 };
 
-/** LeetCode problems, sorted by episode order then problem number. */
+/**
+ * LeetCode problems, ordered by episode. Array.sort is stable, so problems
+ * within the same episode keep their file order (which follows the 0x3f plan:
+ * examples before homework).
+ */
 export function getLeetcode(): LeetcodeContent {
   const data = leetcodeData as LeetcodeContent;
-  const problems = [...data.problems].sort((a, b) => a.ep - b.ep || a.id - b.id);
+  const problems = [...data.problems].sort((a, b) => a.ep - b.ep);
   return { ...data, problems };
 }
 

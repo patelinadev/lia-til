@@ -1,0 +1,29 @@
+{
+  "date": "2026-08-10",
+  "week": "W33",
+  "done": [
+    "0x3f Ep.01 框架总结",
+    "0x3f Ep.02 框架总结",
+    "System Design #2：API Design"
+  ],
+  "summary": null,
+  "note": "LC 209 滑动窗口（Caterpillar，同向双指针，amortized O(n)）；累加器初值 = 运算 identity（sum→0 / product→1 / max→−inf），LC 713 教训",
+  "leetcode": [
+    {
+      "id": 209,
+      "slug": "minimum-size-subarray-sum",
+      "title": "Minimum Size Subarray Sum"
+    },
+    {
+      "id": 3,
+      "slug": "longest-substring-without-repeating-characters",
+      "title": "Longest Substring Without Repeating Characters"
+    },
+    {
+      "id": 713,
+      "slug": "subarray-product-less-than-k",
+      "title": "Subarray Product Less Than K",
+      "solutionUrl": "https://leetcode.com/problems/subarray-product-less-than-k/solutions/8453659/lc-713-subarray-product-less-than-k-slid-uxpn/"
+    }
+  ]
+}

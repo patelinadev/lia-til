@@ -1,0 +1,24 @@
+{
+  "date": "2026-07-30",
+  "week": "W31",
+  "done": [],
+  "summary": null,
+  "note": "0x3f Ep.01 作业：看答案后重写，待盲写确认",
+  "leetcode": [
+    {
+      "id": 16,
+      "slug": "3sum-closest",
+      "title": "3Sum Closest"
+    },
+    {
+      "id": 18,
+      "slug": "4sum",
+      "title": "4Sum"
+    },
+    {
+      "id": 611,
+      "slug": "valid-triangle-number",
+      "title": "Valid Triangle Number"
+    }
+  ]
+}

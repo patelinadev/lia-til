@@ -1,0 +1,9 @@
+{
+  "date": "2026-07-15",
+  "week": "W29",
+  "done": [
+    "System Design #1：Client/Server + Stateless"
+  ],
+  "summary": null,
+  "note": "state 外置到 Redis/DB 让 server 无状态；SD 面试三触发 + 四步答法（让步→定性→代价→缓解）"
+}

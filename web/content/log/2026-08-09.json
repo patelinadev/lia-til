@@ -1,0 +1,20 @@
+{
+  "date": "2026-08-09",
+  "week": "W32",
+  "done": [],
+  "summary": null,
+  "note": "Constraints→目标复杂度（1 秒≈10⁸ 操作，按 N 量级推套路）；Time/Space 计算法（数元素被处理次数 + 审计 allocate 的变量）",
+  "leetcode": [
+    {
+      "id": 125,
+      "slug": "valid-palindrome",
+      "title": "Valid Palindrome",
+      "solutionUrl": "https://leetcode.com/problems/valid-palindrome/solutions/8451668/two-pointers-with-in-place-skipping-by-l-rkgb/"
+    },
+    {
+      "id": 2105,
+      "slug": "watering-plants-ii",
+      "title": "Watering Plants II"
+    }
+  ]
+}
