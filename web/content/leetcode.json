@@ -8,7 +8,8 @@
       "slug": "two-sum-ii-input-array-is-sorted",
       "title": "Two Sum II - Input Array Is Sorted",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "Binary Search"
       ],
       "ep": 1,
       "difficulty": "Medium",
@@ -21,7 +22,8 @@
       "slug": "3sum",
       "title": "3Sum",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "Sorting"
       ],
       "ep": 1,
       "difficulty": "Medium",
@@ -34,7 +36,8 @@
       "slug": "count-pairs-whose-sum-is-less-than-target",
       "title": "Count Pairs Whose Sum is Less than Target",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "Sorting"
       ],
       "ep": 1,
       "difficulty": "Easy",
@@ -47,7 +50,8 @@
       "slug": "3sum-closest",
       "title": "3Sum Closest",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "Sorting"
       ],
       "ep": 1,
       "difficulty": "Medium",
@@ -60,7 +64,8 @@
       "slug": "4sum",
       "title": "4Sum",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "Sorting"
       ],
       "ep": 1,
       "difficulty": "Medium",
@@ -73,7 +78,8 @@
       "slug": "valid-triangle-number",
       "title": "Valid Triangle Number",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "Sorting"
       ],
       "ep": 1,
       "difficulty": "Medium",
@@ -86,7 +92,8 @@
       "slug": "container-with-most-water",
       "title": "Container With Most Water",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "Greedy"
       ],
       "ep": 2,
       "difficulty": "Medium",
@@ -99,7 +106,9 @@
       "slug": "trapping-rain-water",
       "title": "Trapping Rain Water",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "Dynamic Programming",
+        "Monotonic Stack"
       ],
       "ep": 2,
       "difficulty": "Hard",
@@ -112,7 +121,9 @@
       "slug": "valid-palindrome",
       "title": "Valid Palindrome",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "String",
+        "Palindrome"
       ],
       "ep": 2,
       "difficulty": "Easy",
@@ -125,7 +136,8 @@
       "slug": "watering-plants-ii",
       "title": "Watering Plants II",
       "topics": [
-        "Two Pointers"
+        "Two Pointers",
+        "Array"
       ],
       "ep": 2,
       "difficulty": "Medium",
@@ -138,7 +150,8 @@
       "slug": "minimum-size-subarray-sum",
       "title": "Minimum Size Subarray Sum",
       "topics": [
-        "Sliding Window"
+        "Sliding Window",
+        "Prefix Sum"
       ],
       "ep": 3,
       "difficulty": "Medium",
@@ -151,7 +164,9 @@
       "slug": "longest-substring-without-repeating-characters",
       "title": "Longest Substring Without Repeating Characters",
       "topics": [
-        "Sliding Window"
+        "Sliding Window",
+        "Hash Table",
+        "String"
       ],
       "ep": 3,
       "difficulty": "Medium",
@@ -177,7 +192,9 @@
       "slug": "maximum-length-substring-with-two-occurrences",
       "title": "Maximum Length Substring With Two Occurrences",
       "topics": [
-        "Sliding Window"
+        "Sliding Window",
+        "Hash Table",
+        "String"
       ],
       "ep": 3,
       "difficulty": "Easy",
@@ -190,7 +207,8 @@
       "slug": "length-of-longest-subarray-with-at-most-k-frequency",
       "title": "Length of Longest Subarray With at Most K Frequency",
       "topics": [
-        "Sliding Window"
+        "Sliding Window",
+        "Hash Table"
       ],
       "ep": 3,
       "difficulty": "Medium",
