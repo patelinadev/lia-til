@@ -396,16 +396,27 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
                       </div>
                     </div>
                   ))}
-                  <p className="border-t border-neutral-200 pt-2 text-xs leading-relaxed text-neutral-500 dark:border-neutral-700">
-                    Every problem carries <b className="text-neutral-700 dark:text-neutral-300">one</b>{" "}
-                    of these 5 tags. They&rsquo;re grouped by how independently you can solve it:{" "}
-                    <b className="text-neutral-700 dark:text-neutral-300">To Do</b> = not on your own
-                    yet (don&rsquo;t understand it, or only passed after reading the solution);{" "}
-                    <b className="text-neutral-700 dark:text-neutral-300">In Progress</b> = solved
-                    once independently but not locked in (first pass, or needs another review);{" "}
-                    <b className="text-neutral-700 dark:text-neutral-300">Complete</b> = solved
-                    independently a second time.
-                  </p>
+                  <div className="border-t border-neutral-200 pt-2 text-xs leading-relaxed text-neutral-500 dark:border-neutral-700">
+                    <p>
+                      Every problem carries{" "}
+                      <b className="text-neutral-700 dark:text-neutral-300">one</b> of these 5 tags,
+                      grouped by how independently you can solve it:
+                    </p>
+                    <ul className="mt-1.5 flex flex-col gap-1.5">
+                      <li>
+                        <b className="text-neutral-700 dark:text-neutral-300">To Do</b> — not on your
+                        own yet (don&rsquo;t understand it, or only passed after reading the solution)
+                      </li>
+                      <li>
+                        <b className="text-neutral-700 dark:text-neutral-300">In Progress</b> — solved
+                        once independently but not locked in (first pass, or needs another review)
+                      </li>
+                      <li>
+                        <b className="text-neutral-700 dark:text-neutral-300">Complete</b> — solved
+                        independently a second time
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </Menu>
             )}
