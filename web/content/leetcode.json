@@ -1,0 +1,34 @@
+{
+  "track": "0x3f Basic Algorithms",
+  "trackUrl": "https://space.bilibili.com/206214/channel/collectiondetail?sid=842776",
+  "updatedAt": "2026-08-19",
+  "problems": [
+    {
+      "id": 42,
+      "slug": "trapping-rain-water",
+      "title": "Trapping Rain Water",
+      "pattern": "Two Pointers",
+      "ep": 2,
+      "difficulty": "Hard",
+      "solutionUrl": "https://leetcode.com/problems/trapping-rain-water/solutions/8443625/lc-42-trapping-rain-water-by-l2c255-tu63/"
+    },
+    {
+      "id": 125,
+      "slug": "valid-palindrome",
+      "title": "Valid Palindrome",
+      "pattern": "Two Pointers",
+      "ep": 2,
+      "difficulty": "Easy",
+      "solutionUrl": "https://leetcode.com/problems/valid-palindrome/solutions/8451668/two-pointers-with-in-place-skipping-by-l-rkgb/"
+    },
+    {
+      "id": 713,
+      "slug": "subarray-product-less-than-k",
+      "title": "Subarray Product Less Than K",
+      "pattern": "Sliding Window",
+      "ep": 3,
+      "difficulty": "Medium",
+      "solutionUrl": "https://leetcode.com/problems/subarray-product-less-than-k/solutions/8453659/lc-713-subarray-product-less-than-k-slid-uxpn/"
+    }
+  ]
+}
