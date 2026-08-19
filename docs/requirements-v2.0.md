@@ -84,9 +84,14 @@
 
 ---
 
-## 5. 待定决策（开工前钉死）
+## 5. 关键决策
 
-1. **网站读后端的方式**：build 时抓 + 定时重建（保持静态省钱），还是 ISR / 运行时抓（更实时）—— S1 定。
-2. **后台管理形态**：Next.js 里的私有路由页，还是独立 admin；Markdown 编辑器选型（如 CodeMirror + markdown 渲染）。
-3. **daily-planner / learning-log skill 迁后端的具体改法** —— 另开一次讨论。
-4. **LeetCode 何时迁**（S1 只做投递；LeetCode 放后面）。
+**✅ 已定（2026-08-19）：**
+- **网站读后端 = 运行时抓取（dynamic / SSR）** —— 数据页每次打开从后端现取最新，「打开即最新、写完刷新即见」，**不再靠 push/重建**。
+- **后台管理 = Next.js 私有路由页** —— 同一个 app，登录后才可见的 `/admin` 页（不做独立 admin 应用）。
+- **「简历」= 投递里的 `Resume` 字段** —— 随 applications 在 **S1 一起迁**，不单独排。
+- **LeetCode 迁移单独排在后面**（S1 只做投递这条最干净的线；LeetCode 放 S3 之后）。
+
+**⏳ 待定（后面单独聊）：**
+- `daily-planner` / `learning-log` skill 迁后端的具体改法。
+- Markdown 编辑器选型（如 CodeMirror / textarea + markdown 渲染）。
