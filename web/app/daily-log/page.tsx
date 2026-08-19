@@ -61,12 +61,16 @@ export default function DailyLogPage() {
               )}
 
               {entry.leetcode && entry.leetcode.length > 0 && (
-                <ul className="mt-3 flex flex-col gap-1.5">
+                <ul className="mt-3 flex flex-wrap gap-2">
                   {entry.leetcode.map((p) => (
-                    <li key={p.slug} className="text-sm">
+                    <li
+                      key={p.slug}
+                      className="inline-flex items-center gap-2 rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-900"
+                    >
+                      <span aria-hidden>&#10003;</span>
                       <a
                         href={problemUrl(p.slug)}
-                        className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                        className="font-medium hover:underline"
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -75,7 +79,7 @@ export default function DailyLogPage() {
                       {p.solutionUrl && (
                         <a
                           href={p.solutionUrl}
-                          className="ml-2 text-neutral-500 hover:underline"
+                          className="text-neutral-500 hover:underline dark:text-neutral-400"
                           target="_blank"
                           rel="noopener noreferrer"
                         >

@@ -2,9 +2,9 @@
   "date": "2026-08-10",
   "week": "W33",
   "done": [
-    "0x3f Ep.01 框架总结",
-    "0x3f Ep.02 框架总结",
-    "System Design #2：API Design"
+    "0x3f Ep.01 framework summary",
+    "0x3f Ep.02 framework summary",
+    "System Design #2: API Design"
   ],
   "summary": null,
   "note": "LC 209 滑动窗口（Caterpillar，同向双指针，amortized O(n)）；累加器初值 = 运算 identity（sum→0 / product→1 / max→−inf），LC 713 教训",
