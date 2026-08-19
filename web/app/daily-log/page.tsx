@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Reveal from "@/app/components/Reveal";
-import { getLog, problemUrl } from "@/lib/content";
+import { getLog } from "@/lib/content.server";
+import { problemUrl } from "@/lib/content";
 
 export const metadata = {
   title: "Daily Log · Lia's Learning Progress",
