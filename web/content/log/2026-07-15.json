@@ -5,5 +5,5 @@
     "System Design #1: Client/Server + Stateless"
   ],
   "summary": null,
-  "note": "state 外置到 Redis/DB 让 server 无状态；SD 面试三触发 + 四步答法（让步→定性→代价→缓解）"
+  "note": "Externalize state to Redis/DB to keep the server stateless; the 3 System-Design interview triggers + a 4-step answer (concede → classify → cost → mitigate)"
 }

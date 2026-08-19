@@ -3,13 +3,12 @@
   "week": "W32",
   "done": [],
   "summary": null,
-  "note": "Constraints→目标复杂度（1 秒≈10⁸ 操作，按 N 量级推套路）；Time/Space 计算法（数元素被处理次数 + 审计 allocate 的变量）",
+  "note": "Constraints → target complexity (≈10⁸ ops/second; infer the approach from N's magnitude); computing time/space (count how many times each element is processed + audit allocated variables)",
   "leetcode": [
     {
       "id": 125,
       "slug": "valid-palindrome",
-      "title": "Valid Palindrome",
-      "solutionUrl": "https://leetcode.com/problems/valid-palindrome/solutions/8451668/two-pointers-with-in-place-skipping-by-l-rkgb/"
+      "title": "Valid Palindrome"
     },
     {
       "id": 2105,

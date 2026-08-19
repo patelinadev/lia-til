@@ -3,5 +3,5 @@
   "week": "W18",
   "done": [],
   "summary": null,
-  "note": "Hash Table：任何遍历都是 O(n)；Hash Map 为何 O(1)（hash function 直接算下标）及碰撞退化 O(n) 的原理"
+  "note": "Hash Table: any traversal is O(n); why Hash Map is O(1) (the hash function computes the index directly) and how collisions degrade it to O(n)"
 }

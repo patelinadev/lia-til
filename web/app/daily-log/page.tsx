@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Reveal from "@/app/components/Reveal";
-import { getLog } from "@/lib/content.server";
-import { problemUrl } from "@/lib/content";
+import { getLog, getLeetcode } from "@/lib/content.server";
 
 export const metadata = {
   title: "Daily Log · Lia's Learning Progress",
@@ -14,6 +13,11 @@ function formatDate(iso: string): string {
 
 export default function DailyLogPage() {
   const log = getLog();
+  // Single source for solution links: look them up from leetcode.json by id,
+  // so adding a solution there auto-fills the daily log too.
+  const solutionById = new Map(
+    getLeetcode().problems.map((p) => [p.id, p.solutionUrl] as const),
+  );
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-16">
@@ -62,32 +66,31 @@ export default function DailyLogPage() {
 
               {entry.leetcode && entry.leetcode.length > 0 && (
                 <ul className="mt-3 flex flex-wrap gap-2">
-                  {entry.leetcode.map((p) => (
-                    <li
-                      key={p.slug}
-                      className="inline-flex items-center gap-2 rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-900"
-                    >
-                      <span aria-hidden>&#10003;</span>
-                      <a
-                        href={problemUrl(p.slug)}
-                        className="font-medium hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
+                  {entry.leetcode.map((p) => {
+                    const solution = solutionById.get(p.id) ?? p.solutionUrl ?? null;
+                    return (
+                      <li
+                        key={p.slug}
+                        className="inline-flex items-center gap-2 rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-900"
                       >
-                        LC {p.id} · {p.title}
-                      </a>
-                      {p.solutionUrl && (
-                        <a
-                          href={p.solutionUrl}
-                          className="text-neutral-500 hover:underline dark:text-neutral-400"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          solution &#8599;
-                        </a>
-                      )}
-                    </li>
-                  ))}
+                        <span aria-hidden>&#10003;</span>
+                        {solution ? (
+                          <a
+                            href={solution}
+                            className="font-medium hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            LC {p.id} · {p.title} &#8599;
+                          </a>
+                        ) : (
+                          <span className="font-medium">
+                            LC {p.id} · {p.title}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
 

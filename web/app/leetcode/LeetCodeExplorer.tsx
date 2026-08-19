@@ -32,14 +32,6 @@ const STATUS_GROUPS: { category: StatusCategory; statuses: Status[] }[] = [
   { category: "To Do", statuses: ["Passed after read", "Don't understand"] },
 ];
 
-const STATUS_DESCRIPTIONS: Record<Status, string> = {
-  "Second pass": "Solved independently a second time",
-  "First pass": "Solved once independently — needs a second pass",
-  "Need review": "Needs another look / redo",
-  "Passed after read": "Only passed after reading the solution",
-  "Don't understand": "Not understood yet",
-};
-
 type SortKey = "id" | "difficulty" | "date";
 type Col = "topic" | "difficulty" | "status";
 
@@ -106,7 +98,7 @@ function Count({ n }: { n: number }) {
 export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) {
   const [topics, setTopics] = useState<Set<string>>(new Set());
   const [diffs, setDiffs] = useState<Set<Difficulty>>(new Set());
-  const [statuses, setStatuses] = useState<Set<Status>>(new Set());
+  const [statusCats, setStatusCats] = useState<Set<StatusCategory>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -118,7 +110,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
     [problems],
   );
 
-  const anyFilter = topics.size > 0 || diffs.size > 0 || statuses.size > 0;
+  const anyFilter = topics.size > 0 || diffs.size > 0 || statusCats.size > 0;
 
   // close menu on scroll / resize so the fixed popover never drifts from its header
   useEffect(() => {
@@ -163,7 +155,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
       (p) =>
         (topics.size === 0 || p.topics.some((t) => topics.has(t))) &&
         (diffs.size === 0 || diffs.has(p.difficulty)) &&
-        (statuses.size === 0 || statuses.has(p.status)),
+        (statusCats.size === 0 || statusCats.has(STATUS_CATEGORY[p.status])),
     );
     if (!sortKey) return rows;
     const dir = sortDir === "asc" ? 1 : -1;
@@ -176,7 +168,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
       if (!b.date) return -1;
       return a.date.localeCompare(b.date) * dir;
     });
-  }, [problems, topics, diffs, statuses, sortKey, sortDir]);
+  }, [problems, topics, diffs, statusCats, sortKey, sortDir]);
 
   const thSort =
     "cursor-pointer select-none font-medium hover:text-neutral-800 dark:hover:text-neutral-200";
@@ -196,7 +188,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
               onClick={() => {
                 setTopics(new Set());
                 setDiffs(new Set());
-                setStatuses(new Set());
+                setStatusCats(new Set());
               }}
               className="underline hover:text-neutral-800 dark:hover:text-neutral-300"
             >
@@ -251,7 +243,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
               <th className="px-4 py-3">
                 <button type="button" onClick={(e) => openMenu("status", e)} className={thFilter}>
                   Status
-                  <Count n={statuses.size} />
+                  <Count n={statusCats.size} />
                   <span aria-hidden className="text-[10px]">
                     ▾
                   </span>
@@ -379,48 +371,40 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
             {openCol === "status" && (
               <Menu
                 title="Filter by status"
-                onClear={statuses.size ? () => setStatuses(new Set()) : undefined}
+                onClear={statusCats.size ? () => setStatusCats(new Set()) : undefined}
               >
-                {STATUS_GROUPS.flatMap((g) => g.statuses).map((s) => (
-                  <Chip
-                    key={s}
-                    active={statuses.has(s)}
-                    onClick={() => setStatuses(toggle(statuses, s))}
-                  >
-                    {s}
-                  </Chip>
-                ))}
+                <div className="flex w-full flex-col gap-1">
+                  {STATUS_GROUPS.map((g) => {
+                    const active = statusCats.has(g.category);
+                    return (
+                      <button
+                        key={g.category}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setStatusCats(toggle(statusCats, g.category))}
+                        className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${
+                          active
+                            ? "bg-neutral-100 dark:bg-neutral-800"
+                            : "hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                        }`}
+                      >
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[g.category]}`}
+                        >
+                          {g.category}
+                        </span>
+                        <span className="text-xs text-neutral-500">{g.statuses.join(" · ")}</span>
+                        {active && <span className="ml-auto text-xs text-neutral-500">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </Menu>
             )}
           </div>
         </>
       )}
 
-      {/* status legend */}
-      <div className="mt-5 rounded-xl border border-neutral-200 p-4 text-sm dark:border-neutral-800">
-        <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-500">
-          What the statuses mean
-        </p>
-        <div className="flex flex-col gap-3">
-          {STATUS_GROUPS.map((g) => (
-            <div key={g.category} className="flex flex-col gap-1.5">
-              <span
-                className={`inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[g.category]}`}
-              >
-                {g.category}
-              </span>
-              <ul className="ml-1 flex flex-col gap-0.5">
-                {g.statuses.map((s) => (
-                  <li key={s} className="text-neutral-600 dark:text-neutral-400">
-                    <span className="font-medium text-neutral-800 dark:text-neutral-200">{s}</span>{" "}
-                    — {STATUS_DESCRIPTIONS[s]}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
