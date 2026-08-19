@@ -1,0 +1,19 @@
+{
+  "date": "2026-04-16",
+  "week": "W16",
+  "done": [],
+  "summary": null,
+  "note": "Hash map 基础：dict/set O(1) 查找 vs list O(n)，空间换时间；Two Sum 心得 + edge-case checklist（空/单元素/重复/负数/无解）",
+  "leetcode": [
+    {
+      "id": 1,
+      "slug": "two-sum",
+      "title": "Two Sum"
+    },
+    {
+      "id": 49,
+      "slug": "group-anagrams",
+      "title": "Group Anagrams"
+    }
+  ]
+}

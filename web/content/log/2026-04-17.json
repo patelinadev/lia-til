@@ -1,0 +1,7 @@
+{
+  "date": "2026-04-17",
+  "week": "W16",
+  "done": [],
+  "summary": null,
+  "note": "List vs Set vs Dict 本质区别与复杂度；排序 O(n log n) 下限；Hash & Complexity 面试金句 + Hash Set 通用框架"
+}
