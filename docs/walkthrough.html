@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>lia-til Walkthrough</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:      #F4F5F7;
+    --surface:     #FFFFFF;
+    --surface-2:   #FBFBFC;
+    --ink:         #18222E;
+    --ink-soft:    #55606C;
+    --ink-faint:   #8A94A0;
+    --border:      #E4E7EC;
+    --border-strong:#D2D7DE;
+
+    --you:  #B26A18;  --you-bg: #F6ECDC;  --you-line: #E6C79A;
+    --me:   #35609E;  --me-bg:  #E7EEF8;  --me-line:  #B9CBE6;
+    --go:   #1E7A57;  --go-bg:  #E0F1EA;  --go-line:  #A8DBC6;
+    --hard: #B23B3B;  --hard-bg:#F7E0E0;
+
+    --shadow: 0 1px 2px rgba(24,34,46,.04), 0 8px 24px -12px rgba(24,34,46,.18);
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --ground:    #0F141A;  --surface: #161D26;  --surface-2: #1B232D;
+      --ink:       #E8EDF3;  --ink-soft:#A4AEBB;  --ink-faint: #6C7783;
+      --border:    #262F3A;  --border-strong:#36414E;
+      --you:  #E0A25E;  --you-bg: #33291B;  --you-line: #5A4526;
+      --me:   #84AAE2;  --me-bg:  #1B2838;  --me-line:  #2F4463;
+      --go:   #61C398;  --go-bg:  #163024;  --go-line:  #295040;
+      --hard: #E88B8B;  --hard-bg:#3A1F1F;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:    #0F141A;  --surface: #161D26;  --surface-2: #1B232D;
+    --ink:       #E8EDF3;  --ink-soft:#A4AEBB;  --ink-faint: #6C7783;
+    --border:    #262F3A;  --border-strong:#36414E;
+    --you:  #E0A25E;  --you-bg: #33291B;  --you-line: #5A4526;
+    --me:   #84AAE2;  --me-bg:  #1B2838;  --me-line:  #2F4463;
+    --go:   #61C398;  --go-bg:  #163024;  --go-line:  #295040;
+    --hard: #E88B8B;  --hard-bg:#3A1F1F;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 800px; margin: 0 auto; padding: clamp(28px,5vw,60px) clamp(18px,4vw,32px) 80px; }
+
+  a { color: var(--me); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* header */
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--ink-faint); margin: 0 0 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; height: 1px; flex: 1; background: var(--border-strong); }
+  h1 {
+    font-family: "Bricolage Grotesque", sans-serif; font-weight: 700;
+    font-size: clamp(30px,6.5vw,46px); line-height: 1.05; letter-spacing: -.01em;
+    text-wrap: balance; margin: 0 0 16px;
+  }
+  .goal { font-size: clamp(15px,2.4vw,17px); color: var(--ink-soft); max-width: 64ch; margin: 0 0 22px; }
+  .goal b { color: var(--ink); font-weight: 600; }
+
+  .rule {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px 16px; margin-bottom: 22px;
+    background: var(--me-bg); border: 1px solid var(--me-line); border-radius: 12px;
+    font-size: 14px; color: var(--ink);
+  }
+  .rule .k {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--me); font-weight: 500; flex: none; padding-top: 2px;
+  }
+  .rule b { color: var(--me); }
+
+  /* stage index */
+  .index { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .index a {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    background: var(--surface); border: 1px solid var(--border); color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .index a:hover { text-decoration: none; border-color: var(--border-strong); }
+  .index .st { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-faint); }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 8px 10px; padding: 12px 16px; margin-bottom: 8px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+  }
+  .legend__item { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-soft); }
+  .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .dot--you { background: var(--you); } .dot--me { background: var(--me); } .dot--go { background: var(--go); }
+  .legend__item b { color: var(--ink); font-weight: 600; }
+  .legend__sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 2px; }
+
+  /* stage section */
+  .stage { margin-top: 40px; scroll-margin-top: 16px; }
+  .stage__head {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px;
+    padding-bottom: 14px; border-bottom: 2px solid var(--border-strong); margin-bottom: 8px;
+  }
+  .badge {
+    font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 12px;
+    padding: 4px 10px; border-radius: 8px; background: var(--ink); color: var(--ground);
+    letter-spacing: .04em; flex: none;
+  }
+  .stage__head h2 {
+    font-family: "Bricolage Grotesque", sans-serif; font-weight: 700;
+    font-size: clamp(21px,3.6vw,26px); margin: 0; letter-spacing: -.01em; flex: 1 1 auto; min-width: 0;
+  }
+  .status {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; font-weight: 500;
+    padding: 4px 10px; border-radius: 999px; flex: none;
+  }
+  .status--done { background: var(--go-bg); color: var(--go); border: 1px solid var(--go-line); }
+  .status--wip  { background: var(--you-bg); color: var(--you); border: 1px solid var(--you-line); }
+  .stage__ver { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-faint); }
+
+  /* phase heading within a stage */
+  .phase { display: flex; align-items: baseline; gap: 12px; margin: 30px 0 6px; }
+  .phase__k { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 500; color: var(--ink-faint); letter-spacing: .1em; }
+  .phase h3 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; font-size: clamp(17px,3vw,20px); margin: 0; letter-spacing: -.01em; }
+  .phase__note { font-size: 13px; color: var(--ink-faint); margin: 2px 0 0 2px; }
+
+  /* timeline steps */
+  ol.timeline { list-style: none; margin: 16px 0 0; padding: 0; }
+  .step { position: relative; display: grid; grid-template-columns: 40px 1fr; gap: 16px; padding-bottom: 20px; }
+  .rail { position: relative; }
+  .rail::before { content: ""; position: absolute; left: 19px; top: 4px; bottom: -20px; width: 2px; background: var(--border); }
+  .step:last-child .rail::before { display: none; }
+  .marker {
+    position: relative; z-index: 1; width: 40px; height: 40px; border-radius: 11px;
+    display: grid; place-items: center; font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 15px;
+    background: var(--surface); border: 1.5px solid var(--border-strong); color: var(--ink);
+  }
+  .step[data-actor="you"] .marker    { border-color: var(--you-line); background: var(--you-bg); color: var(--you); }
+  .step[data-actor="me"] .marker     { border-color: var(--me-line);  background: var(--me-bg);  color: var(--me); }
+  .step[data-actor="verify"] .marker { border-color: var(--go-line);  background: var(--go-bg);  color: var(--go); }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px; }
+  .tag { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 500; letter-spacing: .04em; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-soft); }
+  .tag--you { background: var(--you-bg); color: var(--you); border-color: var(--you-line); }
+  .tag--me  { background: var(--me-bg);  color: var(--me);  border-color: var(--me-line); }
+  .tag--go  { background: var(--go-bg);  color: var(--go);  border-color: var(--go-line); }
+  .card h4 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; font-size: 17px; margin: 0 0 6px; letter-spacing: -.01em; text-wrap: balance; }
+  .card p { margin: 0 0 6px; font-size: 14.5px; color: var(--ink-soft); }
+  .card p:last-child { margin-bottom: 0; }
+  .card b { color: var(--ink); font-weight: 600; }
+  .card ul { margin: 6px 0 0; padding-left: 18px; }
+  .card li { font-size: 14px; color: var(--ink-soft); margin: 3px 0; }
+
+  code { font-family: "IBM Plex Mono", monospace; font-size: .88em; background: var(--surface-2); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; color: var(--ink); }
+  pre.cmd { font-family: "IBM Plex Mono", monospace; font-size: 13px; background: var(--ink); color: #F4F5F7; padding: 12px 14px; border-radius: 10px; margin: 10px 0 4px; overflow-x: auto; line-height: 1.5; }
+  pre.cmd .c { color: #8A94A0; }
+
+  .callout { display: flex; gap: 10px; margin-top: 10px; padding: 10px 12px; background: var(--you-bg); border: 1px solid var(--you-line); border-radius: 10px; font-size: 13.5px; color: var(--ink); }
+  .callout.me { background: var(--me-bg); border-color: var(--me-line); }
+  .callout .k { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--you); font-weight: 500; flex: none; padding-top: 1px; }
+  .callout.me .k { color: var(--me); }
+
+  /* acceptance */
+  .accept { margin-top: 14px; background: var(--go-bg); border: 1px solid var(--go-line); border-radius: 14px; padding: 18px 20px; }
+  .accept h4 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 17px; margin: 0 0 12px; color: var(--go); }
+  .accept ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .accept li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 14.5px; color: var(--ink); }
+  .accept .box { width: 18px; height: 18px; border-radius: 5px; margin-top: 2px; border: 1.5px solid var(--go); background: var(--surface); }
+
+  /* faq */
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 16px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  details[open] { padding-bottom: 4px; }
+  summary { cursor: pointer; list-style: none; padding: 14px 0; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 10px; }
+  summary::-webkit-details-marker { display: none; }
+  summary .q { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--me); flex: none; }
+  summary::after { content: "+"; margin-left: auto; font-family: "IBM Plex Mono", monospace; font-size: 18px; color: var(--ink-faint); }
+  details[open] summary::after { content: "\2013"; }
+  details .a { padding: 0 0 14px; font-size: 14px; color: var(--ink-soft); }
+  details .a b { color: var(--ink); }
+
+  /* loop */
+  .loop { margin-top: 16px; border: 1px dashed var(--border-strong); border-radius: 14px; padding: 18px 20px; background: var(--surface-2); }
+  .loop h4 { font-family:"Bricolage Grotesque",sans-serif; font-weight:600; font-size:16px; margin:0 0 12px; }
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 13.5px; }
+  .flow .node { background: var(--surface); border: 1px solid var(--border); padding: 6px 11px; border-radius: 8px; color: var(--ink); }
+  .flow .arw { color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; }
+
+  /* mock table */
+  .tablewrap { overflow-x: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 12px; }
+  table.demo { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 480px; }
+  table.demo th, table.demo td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  table.demo thead th { background: var(--surface-2); font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
+  table.demo tbody tr:last-child td { border-bottom: none; }
+  table.demo td.num { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+  .diff { font-family: "IBM Plex Mono", monospace; font-size: 11px; padding: 2px 7px; border-radius: 999px; }
+  .diff-e { background: var(--go-bg); color: var(--go); }
+  .diff-m { background: var(--you-bg); color: var(--you); }
+  .diff-h { background: var(--hard-bg); color: var(--hard); }
+
+  /* version history */
+  .vhist { overflow-x: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; }
+  table.ver { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 440px; }
+  table.ver th, table.ver td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  table.ver thead th { background: var(--surface-2); font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
+  table.ver tbody tr:last-child td { border-bottom: none; }
+  table.ver td.v { font-family: "IBM Plex Mono", monospace; color: var(--ink); }
+
+  footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; }
+
+  @media (max-width: 480px) {
+    .step { grid-template-columns: 34px 1fr; gap: 12px; }
+    .marker { width: 34px; height: 34px; border-radius: 10px; font-size: 13px; }
+    .rail::before { left: 16px; }
+  }
+  .stage, .accept, details, .loop, .index, .rule { animation: rise .5s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">lia-til · dev &amp; deploy walkthrough</p>
+  <h1>Project Walkthrough</h1>
+  <p class="goal">A <b>living document</b> recording the development &amp; deployment steps for every Phase / Stage of lia-til. Keep it open to follow along, and revisit it later as a reference walkthrough.</p>
+
+  <div class="rule">
+    <span class="k">Maintenance rule</span>
+    <span>Every time we advance a <b>Phase</b> or <b>Stage</b>, its <b>development + deployment steps</b> get appended to the end of this doc, with a row added to the <b>Version History</b> below. This document <em>is</em> the project's changelog — kept up to date continuously.</span>
+  </div>
+
+  <div class="index">
+    <a href="#s1"><span class="st">P1·S1</span> First Deploy <span class="dot dot--go"></span></a>
+    <a href="#s2"><span class="st">P1·S2</span> Sections + Daily Log <span class="dot dot--go"></span></a>
+  </div>
+
+  <div class="legend">
+    <span class="legend__item"><span class="dot dot--you"></span><b>You</b>&nbsp;— in the browser / Vercel</span>
+    <span class="legend__sep"></span>
+    <span class="legend__item"><span class="dot dot--me"></span><b>Me</b>&nbsp;— in the terminal / git</span>
+    <span class="legend__sep"></span>
+    <span class="legend__item"><span class="dot dot--go"></span><b>Verify</b>&nbsp;— confirm together</span>
+  </div>
+
+  <!-- ============================ STAGE 1 ============================ -->
+  <section class="stage" id="s1">
+    <div class="stage__head">
+      <span class="badge">P1 · S1</span>
+      <h2>First Deploy</h2>
+      <span class="status status--done">✅ Done</span>
+      <span class="stage__ver">v0.1.0</span>
+    </div>
+    <p class="goal">Deploy the Next.js walking skeleton to Vercel and get a public URL anyone can open. <b>The whole point of this stage is proving the "edit file → push → auto-deploy" pipeline end to end</b> — once it works, every later stage deploys for free.</p>
+
+    <div class="phase"><span class="phase__k">A</span><h3>Start in parallel</h3></div>
+    <p class="phase__note">Both steps run at the same time — they don't depend on each other.</p>
+    <ol class="timeline">
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · terminal</span></div>
+          <h4>Verify build locally + merge to main</h4>
+          <p>Run a production build to confirm <code>web/</code> compiles, then merge the skeleton branch into <code>main</code> and push. Vercel's production deploy tracks <code>main</code>.</p>
+          <pre class="cmd">cd web &amp;&amp; npm install &amp;&amp; npm run build
+git checkout main &amp;&amp; git merge feat/phase1-web-skeleton
+git push origin main</pre>
+        </div>
+      </li>
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · browser</span></div>
+          <h4>Sign in to Vercel with GitHub</h4>
+          <p>Open <code>vercel.com</code> → <b>Continue with GitHub</b>, pick the free <b>Hobby</b> plan. When authorizing, granting the <code>lia-til</code> repo is enough.</p>
+          <div class="callout"><span class="k">Note</span><span>Signing in / authorizing is something only <b>you</b> can click — I never touch your account.</span></div>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">B</span><h3>Import &amp; configure</h3></div>
+    <p class="phase__note">All in the Vercel UI — this is where the one real gotcha lives.</p>
+    <ol class="timeline">
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">3</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · browser</span></div>
+          <h4>Import the lia-til repo</h4>
+          <p><b>Add New… → Project</b> → find <code>patelinadev/lia-til</code> → <b>Import</b>. Don't see it? Click <b>Adjust GitHub App Permissions</b> and add it.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">4</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · browser</span><span class="tag tag--you">critical step</span></div>
+          <h4>Set Root Directory to <code>web</code></h4>
+          <p>On the Configure screen → <b>Root Directory</b> → <b>Edit</b> → select <code>web</code>. The Next.js app lives in a subdirectory; skip this and the build fails / renders blank — the <b>one gotcha</b> of this whole setup. Once set, the Framework Preset auto-detects <b>Next.js</b>.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">5</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · browser</span></div>
+          <h4>Click Deploy, wait 1–2 min</h4>
+          <p>No environment variables, no database — just hit <b>Deploy</b>. All green means success.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">C</span><h3>Get the URL &amp; verify</h3></div>
+    <ol class="timeline">
+      <li class="step" data-actor="verify">
+        <div class="rail"><div class="marker">6</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--go">Verify</span></div>
+          <h4>Check against the acceptance criteria</h4>
+          <div class="accept">
+            <h4>Stage 1 acceptance</h4>
+            <ul>
+              <li><span class="box"></span><span>Open the URL in an <b>incognito window</b> (or send it to someone) — visible with <b>no login</b>.</span></li>
+              <li><span class="box"></span><span>The page renders the progress content correctly.</span></li>
+              <li><span class="box"></span><span>Ask <b>me to change one thing</b> → push → the change is live after ~1 min (pipeline proof).</span></li>
+            </ul>
+          </div>
+          <p style="margin-top:12px">✅ All three passed — verified auto-deploy by pushing the "landing copy → English" change. Stage 1 shipped.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">?</span><h3>Troubleshooting</h3></div>
+    <details><summary><span class="q">Q1</span>Vercel build fails / blank page / 404</summary><div class="a">Almost always <b>Root Directory isn't set to <code>web</code></b>. Settings → General → Root Directory → set <code>web</code>, then Redeploy.</div></details>
+    <details><summary><span class="q">Q2</span>Can't find lia-til when importing</summary><div class="a">Click <b>Adjust GitHub App Permissions</b> and grant Vercel access to the <code>lia-til</code> repo.</div></details>
+    <details><summary><span class="q">Q3</span>Pushed, but the site didn't change</summary><div class="a">Confirm you pushed to the production branch <b><code>main</code></b>. Vercel's <b>Deployments</b> tab shows every build triggered by a push.</div></details>
+  </section>
+
+  <!-- ============================ STAGE 2 ============================ -->
+  <section class="stage" id="s2">
+    <div class="stage__head">
+      <span class="badge">P1 · S2</span>
+      <h2>Section Routes + Daily Log Timeline</h2>
+      <span class="status status--done">✅ Done</span>
+      <span class="stage__ver">v0.2.0</span>
+    </div>
+    <p class="goal">Turn the placeholder skeleton into a real site: a <b>minimal home hub</b> that links into two separate section routes — a <b>LeetCode</b> table and a <b>Daily Log</b> timeline — so nothing piles onto one long page. Data comes from JSON files in the repo — still <b>no backend, no database, no new dependencies</b>.</p>
+
+    <div class="callout me"><span class="k">Key</span><span><b>S2 needs no new deployment setup.</b> S1 already wired the Vercel pipeline — from now on, deploying any content stage just means the standard git flow: push to <code>main</code>, it auto-deploys. That's the payoff of building the walking skeleton first.</span></div>
+
+    <div class="phase"><span class="phase__k">A</span><h3>Structure — three routes</h3></div>
+    <p class="phase__note">Home stays minimal; each section gets its own page.</p>
+    <ol class="timeline">
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">App Router</span></div>
+          <h4>A hub that links into two sections</h4>
+          <pre class="cmd">/            <span class="c"># minimal black-screen hub → two entry cards</span>
+/leetcode    <span class="c"># pattern-based problem table</span>
+/daily-log   <span class="c"># tree-trunk day-by-day timeline</span></pre>
+          <p>Built with <code>next/link</code> navigation; all three routes <b>prerender as static</b>.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">/leetcode</span></div>
+          <h4>All 15 solved problems, filterable &amp; sortable</h4>
+          <div class="tablewrap">
+            <table class="demo">
+              <thead><tr><th>#</th><th>Problem</th><th>Topic</th><th>Difficulty</th><th>Status</th><th>Date</th></tr></thead>
+              <tbody>
+                <tr><td class="num">42</td><td>Trapping Rain Water</td><td>Two Pointers</td><td><span class="diff diff-h">Hard</span></td><td>First pass</td><td>08/05</td></tr>
+                <tr><td class="num">713</td><td>Subarray Product Less Than K</td><td>Sliding Window</td><td><span class="diff diff-m">Medium</span></td><td>First pass</td><td>08/10</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ul>
+            <li><b>Columns</b>: Problem + Solution links · <b>Topic</b> (multi-select, each a distinct color via golden-angle hue) · Difficulty · <b>Status</b> (5 states in 3 groups) · <b>Date</b> (last completion). All scraped from <code>0x3f-study-plan.md</code>; dates recovered from the daily-log sweep.</li>
+            <li><b>Sort</b> — click the #, Difficulty, or Date headers (asc → desc → default episode order).</li>
+            <li><b>Filter</b> — multi-select chips for Topic / Difficulty / Status, plus a legend explaining each status.</li>
+          </ul>
+          <div class="callout me"><span class="k">Why it fits S2</span><span>Filter/sort is <b>client-side view state</b> (a Client Component with <code>useState</code>) — no persistence, no backend. That's why it stays in Phase 1. <code>lib/content.ts</code> was split into a client-safe half + a <code>content.server.ts</code> (fs readers) so the browser bundle doesn't pull in <code>node:fs</code>.</span></div>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">3</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">/daily-log</span></div>
+          <h4>Tree-trunk timeline (newest first, scroll for history)</h4>
+          <p>A vertical <b>trunk</b> on the left; each day <b>branches out to the right</b> — header <code>W## · mm/dd/yyyy</code>, then that day's <b>✅ checked items</b> and a <b>one-line summary</b> (you write it; I can draft first). Note days show a single "📝 Wrote notes: …" line — never the full notes.</p>
+          <ul>
+            <li><b>Scroll-reveal micro-animation</b> — nodes fade + slide in on scroll, via a tiny IntersectionObserver client component (<code>app/components/Reveal.tsx</code>). <b>Zero dependencies</b>; respects <code>prefers-reduced-motion</code>.</li>
+            <li><b>LeetCode kept in the log</b> — a day's LeetCode problems render as <b>✓ chips</b> matching the done items, each linking to the problem (+ solution write-up), independent from the <code>/leetcode</code> section.</li>
+            <li><b>20 curated days</b> scraped from the Obsidian daily logs, privacy-filtered.</li>
+          </ul>
+          <div class="callout"><span class="k">Language</span><span>Only the 📝 <b>note</b> line keeps its <b>original language</b> (中英混杂 OK) for accuracy. To-dos, summaries, and titles are <b>English-mandatory</b>, like the rest of the site.</span></div>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">B</span><h3>Data model (JSON in the repo)</h3></div>
+    <ol class="timeline">
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">4</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">web/content/</span></div>
+          <h4>Two content sources, read at build time</h4>
+          <p>Content lives <b>inside</b> the app (<code>web/content/</code>) so Vercel's <code>web</code> root includes it. <code>web/lib/content.ts</code> reads it at build → static pages.</p>
+          <pre class="cmd"><span class="c"># web/content/leetcode.json — the LC table</span>
+{ "id": 42, "slug": "trapping-rain-water",
+  "title": "Trapping Rain Water", "pattern": "Two Pointers",
+  "ep": 2, "difficulty": "Hard",
+  "solutionUrl": "https://leetcode.com/.../solutions/8443625/" }
+
+<span class="c"># web/content/log/2026-08-16.json — one per day</span>
+{ "date": "2026-08-16", "week": "W33",
+  "done": ["Reviewed application materials", "Sent 18 applications"],
+  "summary": "Sunday report-style log — kept the application cadence going.",
+  "note": null,
+  "leetcode": [ <span class="c">/* optional: { id, slug, title, solutionUrl? } */</span> ] }</pre>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">C</span><h3>Develop &amp; deploy — what shipped</h3></div>
+    <p class="phase__note">Six feature branches, each through the standard loop.</p>
+    <ol class="timeline">
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">5</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · terminal</span></div>
+          <h4>Feature branches (all merged &amp; deleted)</h4>
+          <pre class="cmd">feat/content-model            <span class="c"># web/content/ JSON + lib/content.ts + first render</span>
+feat/split-sections           <span class="c"># hub + /leetcode + /daily-log timeline + Reveal</span>
+feat/finalize-s2              <span class="c"># scrape 15 problems + curate 20 daily-log days</span>
+feat/leetcode-filter-sort     <span class="c"># client-side filter/sort + status legend</span>
+feat/topic-colors             <span class="c"># colored topic tags + canonical taxonomy</span>
+feat/daily-log-english-todos  <span class="c"># English to-dos + LeetCode ✓ chips</span></pre>
+          <p>Before writing code, read the modified Next.js 16 docs bundled in <code>web/node_modules/next/dist/docs/</code> (per <code>web/AGENTS.md</code>).</p>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">6</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">every branch</span></div>
+          <h4>Standard deploy loop (every change after S1)</h4>
+          <pre class="cmd">git checkout -b feat/xxx    <span class="c"># branch off main</span>
+<span class="c"># …develop… then verify local build: cd web && npm run build</span>
+git checkout main &amp;&amp; git merge --no-ff feat/xxx
+git push origin main        <span class="c"># → Vercel auto-deploys</span>
+git branch -d feat/xxx      <span class="c"># delete the branch after merge</span></pre>
+        </div>
+      </li>
+      <li class="step" data-actor="verify">
+        <div class="rail"><div class="marker">7</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--go">Done ✅</span></div>
+          <h4>Tagged v0.2.0 — P1S2 complete</h4>
+          <p>All content is in (15 problems, 20 days) and every feature verified in the browser, so the stage was tagged:</p>
+          <pre class="cmd">git tag -a v0.2.0 -m "Phase 1 Stage 2: section routes + LeetCode table + daily log"
+git push origin v0.2.0</pre>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">🔒</span><h3>Privacy (applies to every update)</h3></div>
+    <div class="card">
+      <p><b>Obsidian source files never enter the repo.</b> The repo is public, and the logs contain sensitive material (PhD applications, Success Diary, contact info). We <b>curate</b> rather than sync: only the publishable subset ships (solution links + study-type checked items + a one-line summary you approve). Sensitive items are excluded by default, each passed through a §6 warning check for you to confirm.</p>
+      <p style="margin-top:8px"><b>Example (8/16):</b> the original had "application material audit (SOP / CV / recommendation letters / deadline)" — revealing grad-school applications — so it was <b>genericized</b> to "Reviewed application materials"; the application count was kept.</p>
+    </div>
+
+    <div class="loop">
+      <h4>Daily update loop (every day after S2)</h4>
+      <div class="flow">
+        <span class="node">You drop solution links / today's checked items</span>
+        <span class="arw">→</span>
+        <span class="node">I append JSON + you approve the one-liner</span>
+        <span class="arw">→</span>
+        <span class="node">git push</span>
+        <span class="arw">→</span>
+        <span class="node">Vercel auto-deploys</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ VERSION HISTORY ============================ -->
+  <div class="phase" style="margin-top:44px"><span class="phase__k">§</span><h3>Version History</h3></div>
+  <div class="vhist">
+    <table class="ver">
+      <thead><tr><th>Version</th><th>Milestone</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="v">v0.1.0</td><td>P1 · S1 — First Deploy (Next.js + Vercel auto-deploy pipeline)</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.2.0</td><td>P1 · S2 — Section routes + LeetCode table (filter/sort/status/colored topics) + curated Daily Log</td><td>✅ Done</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>lia-til Walkthrough · dev + deploy steps for each Phase/Stage are appended here · living document, continuously maintained</footer>
+
+</div>
+
+</body>
+</html>
