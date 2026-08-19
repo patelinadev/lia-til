@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Lia · Today I Learn",
-  description: "Lia 的每日学习进度 —— 公开可见。",
+  description: "Lia's daily learning progress — publicly visible.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
