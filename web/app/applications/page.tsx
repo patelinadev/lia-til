@@ -9,24 +9,46 @@ export const metadata = {
 
 const data = applicationsData as ApplicationsData;
 
-// group the raw statuses into a simple funnel
-const GROUPS: { label: string; statuses: string[]; className: string }[] = [
-  { label: "In review", statuses: ["Applied"], className: "text-blue-700 dark:text-blue-400" },
+// Group the known statuses into a funnel. We deliberately do NOT show an
+// "in review" count — an application's real state is unknown until it becomes
+// an OA/response or a rejection. "Heard back" = early responses (they reacted);
+// "Interviewing" = actual interview rounds; "Closed" = rejections.
+const GROUPS: { label: string; hint: string; statuses: string[]; className: string }[] = [
   {
-    label: "Interview stage",
-    statuses: ["OA", "Phone", "Onsite"],
+    label: "Heard back",
+    hint: "OA / recruiter call",
+    statuses: ["OA", "HR call"],
     className: "text-amber-700 dark:text-amber-400",
   },
-  { label: "Offers", statuses: ["Offer"], className: "text-emerald-700 dark:text-emerald-400" },
+  {
+    label: "Interviewing",
+    hint: "phone / onsite rounds",
+    statuses: ["Phone", "Onsite"],
+    className: "text-emerald-700 dark:text-emerald-400",
+  },
+  {
+    label: "Offers",
+    hint: "",
+    statuses: ["Offer"],
+    className: "text-emerald-700 dark:text-emerald-400",
+  },
   {
     label: "Closed",
+    hint: "rejected / ghosted",
     statuses: ["Rejected", "Ghosted"],
-    className: "text-neutral-600 dark:text-neutral-400",
+    className: "text-neutral-500 dark:text-neutral-400",
   },
 ];
 
 function sum(statuses: string[]): number {
   return statuses.reduce((n, s) => n + (data.byStatus[s] ?? 0), 0);
+}
+
+function breakdown(statuses: string[]): string {
+  const parts = statuses
+    .filter((s) => (data.byStatus[s] ?? 0) > 0)
+    .map((s) => `${s} ${data.byStatus[s]}`);
+  return parts.join(" · ");
 }
 
 function formatDate(iso: string): string {
@@ -35,7 +57,8 @@ function formatDate(iso: string): string {
 }
 
 export default function ApplicationsPage() {
-  const groups = GROUPS.filter((g) => g.label === "In review" || sum(g.statuses) > 0);
+  // always show Heard back / Interviewing / Closed; show Offers only once there are any
+  const groups = GROUPS.filter((g) => g.label !== "Offers" || sum(g.statuses) > 0);
   const days = [...data.byDate].reverse(); // newest first
 
   return (
@@ -63,17 +86,28 @@ export default function ApplicationsPage() {
       </div>
 
       {/* status funnel */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
         {groups.map((g) => (
           <div
             key={g.label}
             className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800"
           >
-            <p className={`text-2xl font-semibold tabular-nums ${g.className}`}>{sum(g.statuses)}</p>
-            <p className="mt-1 text-sm text-neutral-500">{g.label}</p>
+            <p className="text-sm text-neutral-500">{g.label}</p>
+            <p className={`mt-1 text-3xl font-semibold tabular-nums ${g.className}`}>
+              {sum(g.statuses)}
+            </p>
+            <p className="mt-1 text-xs text-neutral-400">
+              {breakdown(g.statuses) || (g.hint ? g.hint : "none yet")}
+            </p>
           </div>
         ))}
       </div>
+      <p className="mt-3 text-xs text-neutral-400">
+        No &ldquo;in review&rdquo; count — an application&rsquo;s state is unknown until it becomes a
+        response or a rejection. <b className="text-neutral-500">Heard back</b> = they responded
+        (OA / recruiter call); <b className="text-neutral-500">Interviewing</b> = actual phone/onsite
+        rounds.
+      </p>
 
       {/* over time — vertical timeline, newest first, scroll for the full history */}
       <section className="mt-10">
