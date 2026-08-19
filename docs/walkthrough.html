@@ -389,7 +389,7 @@ git push origin main</pre>
           <ul>
             <li><b>Columns</b>: Problem + Solution links · <b>Topic</b> (multi-select, each a distinct color via golden-angle hue) · Difficulty · <b>Status</b> (5 states in 3 groups) · <b>Date</b> (last completion). All scraped from <code>0x3f-study-plan.md</code>; dates recovered from the daily-log sweep.</li>
             <li><b>Sort</b> — click the #, Difficulty, or Date headers (asc → desc → default episode order).</li>
-            <li><b>Filter</b> — dropdowns that open from the Topic / Difficulty / Status column headers (Difficulty both sorts and filters). The Status filter groups into 3 categories (Complete / In Progress / To&nbsp;Do) with the meaning of each explained inline.</li>
+            <li><b>Filter</b> — dropdowns that open from the Topic / Difficulty / Status column headers (Difficulty both sorts and filters). The Status filter shows the <b>5 status tags</b> grouped under 3 category headers (To&nbsp;Do / In Progress / Complete) — you pick one of the 5 — with the grouping logic explained inline.</li>
           </ul>
           <div class="callout me"><span class="k">Why it fits S2</span><span>Filter/sort is <b>client-side view state</b> (a Client Component with <code>useState</code>) — no persistence, no backend. That's why it stays in Phase 1. <code>lib/content.ts</code> was split into a client-safe half + a <code>content.server.ts</code> (fs readers) so the browser bundle doesn't pull in <code>node:fs</code>.</span></div>
         </div>
