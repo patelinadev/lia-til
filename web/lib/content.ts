@@ -72,6 +72,14 @@ export function problemUrl(slug: string): string {
   return `https://leetcode.com/problems/${slug}/`;
 }
 
+/** Anonymized job-application aggregates (no company details — counts only). */
+export type ApplicationsData = {
+  updatedAt: string | null;
+  totalSubmitted: number;
+  byStatus: Record<string, number>;
+  byDate: { date: string; count: number }[];
+};
+
 /**
  * Canonical topic taxonomy (display form). Order defines each topic's color:
  * hues are spread by the golden angle off the list index, so neighbours in the

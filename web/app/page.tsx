@@ -13,10 +13,10 @@ export default function Home() {
         </p>
       </div>
 
-      <nav className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
+      <nav className="grid w-full max-w-xl gap-3 sm:grid-cols-2">
         <Link
           href="/daily-log"
-          className="group flex flex-1 items-center justify-between rounded-xl border border-neutral-200 px-5 py-4 text-left transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600"
+          className="group flex items-center justify-between rounded-xl border border-neutral-200 px-5 py-4 text-left transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600"
         >
           <span>
             <span className="block font-semibold">Daily Log</span>
@@ -29,11 +29,24 @@ export default function Home() {
 
         <Link
           href="/leetcode"
-          className="group flex flex-1 items-center justify-between rounded-xl border border-neutral-200 px-5 py-4 text-left transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600"
+          className="group flex items-center justify-between rounded-xl border border-neutral-200 px-5 py-4 text-left transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600"
         >
           <span>
             <span className="block font-semibold">LeetCode</span>
             <span className="block text-sm text-neutral-500">Solved problems by pattern</span>
+          </span>
+          <span className="text-neutral-400 transition-transform group-hover:translate-x-0.5">
+            &rarr;
+          </span>
+        </Link>
+
+        <Link
+          href="/applications"
+          className="group flex items-center justify-between rounded-xl border border-neutral-200 px-5 py-4 text-left transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600"
+        >
+          <span>
+            <span className="block font-semibold">Applications</span>
+            <span className="block text-sm text-neutral-500">Job-search progress</span>
           </span>
           <span className="text-neutral-400 transition-transform group-hover:translate-x-0.5">
             &rarr;
