@@ -3,7 +3,7 @@
   "week": "W17",
   "done": [],
   "summary": null,
-  "note": "HashMap 计数（242 Anagram）+ Top K（347 按 value 排序模板）+ 前缀/后缀乘积（238，O(n²)→O(n)）",
+  "note": "HashMap counting (242 Anagram) + Top K (347 sort-by-value template) + prefix/suffix products (238, O(n²)→O(n))",
   "leetcode": [
     {
       "id": 242,

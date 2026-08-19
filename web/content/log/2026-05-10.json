@@ -3,5 +3,5 @@
   "week": "W19",
   "done": [],
   "summary": null,
-  "note": "相向双指针模板（移动能改善结果的一端）；LC 42 接雨水 prefix+suffix 思路 + 双指针 O(1) 空间优化"
+  "note": "Opposite-direction two-pointer template (move the end that can improve the result); LC 42 Trapping Rain Water — prefix+suffix idea + two-pointer O(1)-space optimization"
 }

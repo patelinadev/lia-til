@@ -3,5 +3,5 @@
   "week": "W16",
   "done": [],
   "summary": null,
-  "note": "List vs Set vs Dict 本质区别与复杂度；排序 O(n log n) 下限；Hash & Complexity 面试金句 + Hash Set 通用框架"
+  "note": "List vs Set vs Dict — core differences and complexity; the O(n log n) sorting lower bound; Hash & Complexity interview lines + a general Hash Set template"
 }

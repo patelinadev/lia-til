@@ -7,7 +7,7 @@
     "System Design #2: API Design"
   ],
   "summary": null,
-  "note": "LC 209 滑动窗口（Caterpillar，同向双指针，amortized O(n)）；累加器初值 = 运算 identity（sum→0 / product→1 / max→−inf），LC 713 教训",
+  "note": "LC 209 sliding window (caterpillar, same-direction two pointers, amortized O(n)); accumulator init = the operation's identity (sum→0 / product→1 / max→−inf), a lesson from LC 713",
   "leetcode": [
     {
       "id": 209,
@@ -22,8 +22,7 @@
     {
       "id": 713,
       "slug": "subarray-product-less-than-k",
-      "title": "Subarray Product Less Than K",
-      "solutionUrl": "https://leetcode.com/problems/subarray-product-less-than-k/solutions/8453659/lc-713-subarray-product-less-than-k-slid-uxpn/"
+      "title": "Subarray Product Less Than K"
     }
   ]
 }

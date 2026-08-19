@@ -6,7 +6,7 @@
     "Sent 10 applications"
   ],
   "summary": null,
-  "note": "读代码三层缩放（抓大放小）；.env→环境变量→代码 的 config management；项目简历 bullet 写法",
+  "note": "Reading code at three zoom levels (big picture first); config management via .env → environment variables → code; how to write a project résumé bullet",
   "leetcode": [
     {
       "id": 3090,
