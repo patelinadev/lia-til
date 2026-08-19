@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Reveal from "@/app/components/Reveal";
 import applicationsData from "@/content/applications.json";
 import type { ApplicationsData } from "@/lib/content";
 
@@ -51,15 +50,37 @@ function breakdown(statuses: string[]): string {
   return parts.join(" · ");
 }
 
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${m}/${d}/${y}`;
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+type Cell = { day: number; count: number } | null;
+
+/** Build one Monday-start calendar grid per month that has data. */
+function buildMonths(byDate: { date: string; count: number }[]) {
+  const counts = new Map(byDate.map((d) => [d.date, d.count]));
+  const monthKeys = [...new Set(byDate.map((d) => d.date.slice(0, 7)))].sort();
+  return monthKeys.map((key) => {
+    const [y, m] = key.split("-").map(Number);
+    const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Monday-first offset
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const cells: Cell[] = [];
+    for (let i = 0; i < lead; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = `${key}-${String(d).padStart(2, "0")}`;
+      cells.push({ day: d, count: counts.get(iso) ?? 0 });
+    }
+    return { label: `${MONTHS[m - 1]} ${y}`, cells };
+  });
 }
 
 export default function ApplicationsPage() {
   // always show Heard back / Interviewing / Closed; show Offers only once there are any
   const groups = GROUPS.filter((g) => g.label !== "Offers" || sum(g.statuses) > 0);
-  const days = [...data.byDate].reverse(); // newest first
+  const months = buildMonths(data.byDate);
+  const maxDay = Math.max(...data.byDate.map((d) => d.count), 1);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-12 sm:py-16">
@@ -109,35 +130,49 @@ export default function ApplicationsPage() {
         rounds.
       </p>
 
-      {/* over time — vertical timeline, newest first, scroll for the full history */}
+      {/* over time — calendar, one grid per month; each cell shows that day's count */}
       <section className="mt-10">
         <h2 className="mb-6 text-lg font-semibold">Applications over time</h2>
-        <ol className="relative">
-          {/* the trunk */}
-          <span
-            aria-hidden
-            className="absolute bottom-2 left-2 top-2 w-px bg-neutral-200 dark:bg-neutral-800"
-          />
-
-          {days.map((d, i) => (
-            <li key={d.date} className="relative pb-8 pl-10 last:pb-0">
-              {/* node dot on the trunk */}
-              <span
-                aria-hidden
-                className="absolute left-2 top-1.5 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-neutral-400 bg-white ring-4 ring-white dark:border-neutral-500 dark:bg-neutral-950 dark:ring-neutral-950"
-              />
-              <Reveal delay={Math.min(i, 8) * 50}>
-                <p className="font-mono text-sm text-neutral-500">{formatDate(d.date)}</p>
-                <p className="mt-1">
-                  <span className="text-2xl font-semibold tabular-nums">{d.count}</span>{" "}
-                  <span className="text-sm text-neutral-500">
-                    application{d.count === 1 ? "" : "s"}
-                  </span>
-                </p>
-              </Reveal>
-            </li>
+        <div className="flex flex-col gap-8">
+          {months.map((month) => (
+            <div key={month.label}>
+              <p className="mb-3 text-sm font-medium">{month.label}</p>
+              <div className="grid grid-cols-7 gap-1.5">
+                {WEEKDAYS.map((w) => (
+                  <div
+                    key={w}
+                    className="pb-1 text-center text-xs font-medium text-neutral-400"
+                  >
+                    {w}
+                  </div>
+                ))}
+                {month.cells.map((cell, i) =>
+                  cell === null ? (
+                    <div key={i} />
+                  ) : (
+                    <div
+                      key={i}
+                      className="flex aspect-square flex-col rounded-md border border-neutral-200 p-1.5 dark:border-neutral-800"
+                      style={
+                        cell.count > 0
+                          ? { backgroundColor: `rgba(59, 130, 246, ${0.14 + 0.5 * (cell.count / maxDay)})` }
+                          : undefined
+                      }
+                      title={cell.count > 0 ? `${cell.count} applications` : undefined}
+                    >
+                      <span className="text-[10px] leading-none text-neutral-400">{cell.day}</span>
+                      {cell.count > 0 && (
+                        <span className="mt-auto self-end text-sm font-semibold tabular-nums text-neutral-800 dark:text-neutral-100">
+                          {cell.count}
+                        </span>
+                      )}
+                    </div>
+                  ),
+                )}
+              </div>
+            </div>
           ))}
-        </ol>
+        </div>
       </section>
 
       <p className="mt-8 text-xs text-neutral-400">

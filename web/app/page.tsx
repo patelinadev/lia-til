@@ -5,12 +5,18 @@ export default function Home() {
     <main className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-16 text-center">
       <div className="flex flex-col items-center gap-3">
         <p className="text-sm font-medium uppercase tracking-widest text-neutral-500">
-          Today I Learn
+          Lia&rsquo;s Learning Progress
         </p>
-        <h1 className="text-4xl font-bold sm:text-5xl">Lia&rsquo;s Learning Progress</h1>
-        <p className="max-w-md text-neutral-500">
-          A public record of what Lia is learning. No login required.
-        </p>
+        <h1 className="text-4xl font-bold sm:text-5xl">Today I Learned</h1>
+        <p className="max-w-md text-neutral-500">A public record of what Lia is learning.</p>
+        <a
+          href="https://github.com/patelinadev"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-neutral-500 underline-offset-2 transition-colors hover:text-neutral-800 hover:underline dark:hover:text-neutral-300"
+        >
+          github.com/patelinadev &#8599;
+        </a>
       </div>
 
       <nav className="grid w-full max-w-xl gap-3 sm:grid-cols-2">
