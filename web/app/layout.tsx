@@ -23,7 +23,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <footer className="px-6 py-6 text-center text-[11px] text-neutral-300 dark:text-neutral-700">
+          Developed by{" "}
+          <a
+            href="https://github.com/patelinadev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline"
+          >
+            Lia
+          </a>
+        </footer>
+      </body>
     </html>
   );
 }

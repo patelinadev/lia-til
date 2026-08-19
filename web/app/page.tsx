@@ -8,15 +8,6 @@ export default function Home() {
           Lia&rsquo;s Learning Progress
         </p>
         <h1 className="text-4xl font-bold sm:text-5xl">Today I Learned</h1>
-        <p className="max-w-md text-neutral-500">A public record of what Lia is learning.</p>
-        <a
-          href="https://github.com/patelinadev"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-neutral-500 underline-offset-2 transition-colors hover:text-neutral-800 hover:underline dark:hover:text-neutral-300"
-        >
-          github.com/patelinadev &#8599;
-        </a>
       </div>
 
       <nav className="grid w-full max-w-xl gap-3 sm:grid-cols-2">
