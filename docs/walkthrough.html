@@ -246,6 +246,7 @@
   <div class="index">
     <a href="#s1"><span class="st">P1·S1</span> First Deploy <span class="dot dot--go"></span></a>
     <a href="#s2"><span class="st">P1·S2</span> Sections + Daily Log <span class="dot dot--go"></span></a>
+    <a href="#p2"><span class="st">Phase 2</span> Cloud Backend <span class="dot dot--you"></span></a>
   </div>
 
   <div class="legend">
@@ -508,6 +509,134 @@ git push origin v0.2.0</pre>
     </div>
   </section>
 
+  <!-- ============================ PHASE 2 ============================ -->
+  <section class="stage" id="p2">
+    <div class="stage__head">
+      <span class="badge">Phase 2</span>
+      <h2>Cloud Backend</h2>
+      <span class="status status--wip">🗺️ Planned</span>
+      <span class="stage__ver">v0.3.x (target)</span>
+    </div>
+    <p class="goal">One cloud <b>FastAPI + PostgreSQL</b> backend as the single source of truth (applications / LeetCode / daily log). You edit in one place; the site fetches the latest on every open; you log in to see full private data. Full design: <code>docs/requirements-v2.0.md</code>.</p>
+
+    <div class="callout me"><span class="k">Decided</span><span>Site reads the backend <b>at request time</b> (dynamic — open = latest, no rebuild). Admin = <b>private routes inside the same app</b>, GitHub-login-gated. Public still gets <b>aggregates only</b> (§6 holds).</span></div>
+
+    <div class="phase"><span class="phase__k">S1</span><h3>Backend skeleton + Applications</h3></div>
+    <p class="phase__note">Prove client → server → DB → deploy with the cleanest data line first.</p>
+    <ol class="timeline">
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · Railway</span></div>
+          <h4>Create a Railway project + PostgreSQL</h4>
+          <p>Sign in to Railway, provision a Postgres DB, connect it to the repo's <code>backend/</code>, and set the env vars. Account + secrets are yours — I don't touch credentials.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · backend</span></div>
+          <h4>FastAPI + applications schema + importer</h4>
+          <p>Scaffold FastAPI, an <code>applications</code> table (+ status events), a one-time importer for the local ledger, and a <b>public aggregate endpoint</b> (counts only — no company data).</p>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">3</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · site</span></div>
+          <h4>Site fetches the aggregates at request time</h4>
+          <p>Point <code>/applications</code> at the API (dynamic), replacing the build-time JSON.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="verify">
+        <div class="rail"><div class="marker">4</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--go">Verify</span></div>
+          <h4>Numbers come from the DB</h4>
+          <p>Open <code>/applications</code> → the counts are served from Postgres, not a committed file. No rebuild needed.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">S2</span><h3>Login + private view</h3></div>
+    <ol class="timeline">
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · GitHub</span></div>
+          <h4>Create a GitHub OAuth app</h4>
+          <p>Register the OAuth app, put its client id/secret into Vercel env vars. Credentials are yours; I never enter them.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · auth</span></div>
+          <h4>GitHub login + private endpoint + private page</h4>
+          <p>Wire Auth.js (GitHub), allow only <code>patelinadev</code>; add a private full-applications endpoint (<b>server-side auth</b>) and a logged-in page showing company / role / salary / notes.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="verify">
+        <div class="rail"><div class="marker">3</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--go">Verify</span></div>
+          <h4>Full only when authenticated</h4>
+          <p>Logged in → full detail; logged out → only public aggregates. Private data never leaves the server unauthenticated.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">S3</span><h3>Admin buffer + daily logs</h3></div>
+    <ol class="timeline">
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · admin + logs</span></div>
+          <h4>daily_logs + Markdown editor + edit forms</h4>
+          <p>Add a <code>daily_logs</code> table + importer (migrate the Obsidian logs); build the private <code>/admin</code> pages — a <b>Markdown editor with live preview</b> for logs and an edit form for applications; the public timeline reads a curated subset from the backend.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="verify">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--go">Verify</span></div>
+          <h4>You can hand-edit without Claude</h4>
+          <p>Edit a log in the admin editor → saved to the DB → visible on refresh.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">S4</span><h3>Claude write-API + scheduled sync</h3></div>
+    <ol class="timeline">
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · secrets</span></div>
+          <h4>Provision the API token + scheduler</h4>
+          <p>Mint an API token; set up the cloud scheduled task's connector/credentials.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · write API + cron</span></div>
+          <h4>Token-protected writes + daily sync</h4>
+          <p>Add write endpoints so Claude records via the API (same conversation, new target); wire a daily cloud scheduled task that hits the API — runs anywhere, no local files.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="verify">
+        <div class="rail"><div class="marker">3</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--go">Verify</span></div>
+          <h4>Closed loop</h4>
+          <p>"I applied to X" → Claude POSTs → it appears; the scheduled task runs from the cloud with no local access.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="callout"><span class="k">Parked</span><span>Migrating the daily-planner / learning-log skills to the backend, the Markdown-editor pick, and the LeetCode migration are deferred (see <code>requirements-v2.0.md</code> §4–5).</span></div>
+  </section>
+
   <!-- ============================ VERSION HISTORY ============================ -->
   <div class="phase" style="margin-top:44px"><span class="phase__k">§</span><h3>Version History</h3></div>
   <div class="vhist">
@@ -517,6 +646,7 @@ git push origin v0.2.0</pre>
         <tr><td class="v">v0.1.0</td><td>P1 · S1 — First Deploy (Next.js + Vercel auto-deploy pipeline)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.2.0</td><td>P1 · S2 core — section routes + LeetCode table (filter/sort/status/colored topics) + curated Daily Log</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.2.x</td><td>P1 · S2 wrap-up — anonymized Applications dashboard + calendar · System Design tree + per-deck detail pages · "Today I Learned" home + footer</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.3.x</td><td>Phase 2 — cloud backend (FastAPI + Postgres) · login + private views · admin editor · daily scheduled sync</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
   </div>
