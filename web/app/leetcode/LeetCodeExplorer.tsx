@@ -26,10 +26,12 @@ const STATUS_STYLES: Record<StatusCategory, string> = {
   "To Do": "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400",
 };
 
+// The 5 real status tags, grouped into 3 categories by how independently the
+// problem can be solved. You pick one of the 5 tags; the categories are just labels.
 const STATUS_GROUPS: { category: StatusCategory; statuses: Status[] }[] = [
+  { category: "To Do", statuses: ["Don't understand", "Passed after read"] },
+  { category: "In Progress", statuses: ["Need review", "First pass"] },
   { category: "Complete", statuses: ["Second pass"] },
-  { category: "In Progress", statuses: ["First pass", "Need review"] },
-  { category: "To Do", statuses: ["Passed after read", "Don't understand"] },
 ];
 
 type SortKey = "id" | "difficulty" | "date";
@@ -98,7 +100,7 @@ function Count({ n }: { n: number }) {
 export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) {
   const [topics, setTopics] = useState<Set<string>>(new Set());
   const [diffs, setDiffs] = useState<Set<Difficulty>>(new Set());
-  const [statusCats, setStatusCats] = useState<Set<StatusCategory>>(new Set());
+  const [statuses, setStatuses] = useState<Set<Status>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -110,7 +112,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
     [problems],
   );
 
-  const anyFilter = topics.size > 0 || diffs.size > 0 || statusCats.size > 0;
+  const anyFilter = topics.size > 0 || diffs.size > 0 || statuses.size > 0;
 
   // close menu on scroll / resize so the fixed popover never drifts from its header
   useEffect(() => {
@@ -155,7 +157,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
       (p) =>
         (topics.size === 0 || p.topics.some((t) => topics.has(t))) &&
         (diffs.size === 0 || diffs.has(p.difficulty)) &&
-        (statusCats.size === 0 || statusCats.has(STATUS_CATEGORY[p.status])),
+        (statuses.size === 0 || statuses.has(p.status)),
     );
     if (!sortKey) return rows;
     const dir = sortDir === "asc" ? 1 : -1;
@@ -168,7 +170,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
       if (!b.date) return -1;
       return a.date.localeCompare(b.date) * dir;
     });
-  }, [problems, topics, diffs, statusCats, sortKey, sortDir]);
+  }, [problems, topics, diffs, statuses, sortKey, sortDir]);
 
   const thSort =
     "cursor-pointer select-none font-medium hover:text-neutral-800 dark:hover:text-neutral-200";
@@ -188,7 +190,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
               onClick={() => {
                 setTopics(new Set());
                 setDiffs(new Set());
-                setStatusCats(new Set());
+                setStatuses(new Set());
               }}
               className="underline hover:text-neutral-800 dark:hover:text-neutral-300"
             >
@@ -243,7 +245,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
               <th className="px-4 py-3">
                 <button type="button" onClick={(e) => openMenu("status", e)} className={thFilter}>
                   Status
-                  <Count n={statusCats.size} />
+                  <Count n={statuses.size} />
                   <span aria-hidden className="text-[10px]">
                     ▾
                   </span>
@@ -371,33 +373,39 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
             {openCol === "status" && (
               <Menu
                 title="Filter by status"
-                onClear={statusCats.size ? () => setStatusCats(new Set()) : undefined}
+                onClear={statuses.size ? () => setStatuses(new Set()) : undefined}
               >
-                <div className="flex w-full flex-col gap-1">
-                  {STATUS_GROUPS.map((g) => {
-                    const active = statusCats.has(g.category);
-                    return (
-                      <button
-                        key={g.category}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => setStatusCats(toggle(statusCats, g.category))}
-                        className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${
-                          active
-                            ? "bg-neutral-100 dark:bg-neutral-800"
-                            : "hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
-                        }`}
+                <div className="flex w-full flex-col gap-3">
+                  {STATUS_GROUPS.map((g) => (
+                    <div key={g.category} className="flex flex-col gap-1.5">
+                      <span
+                        className={`w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[g.category]}`}
                       >
-                        <span
-                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[g.category]}`}
-                        >
-                          {g.category}
-                        </span>
-                        <span className="text-xs text-neutral-500">{g.statuses.join(" · ")}</span>
-                        {active && <span className="ml-auto text-xs text-neutral-500">✓</span>}
-                      </button>
-                    );
-                  })}
+                        {g.category}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {g.statuses.map((s) => (
+                          <Chip
+                            key={s}
+                            active={statuses.has(s)}
+                            onClick={() => setStatuses(toggle(statuses, s))}
+                          >
+                            {s}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="border-t border-neutral-200 pt-2 text-xs leading-relaxed text-neutral-500 dark:border-neutral-700">
+                    Every problem carries <b className="text-neutral-700 dark:text-neutral-300">one</b>{" "}
+                    of these 5 tags. They&rsquo;re grouped by how independently you can solve it:{" "}
+                    <b className="text-neutral-700 dark:text-neutral-300">To Do</b> = not on your own
+                    yet (don&rsquo;t understand it, or only passed after reading the solution);{" "}
+                    <b className="text-neutral-700 dark:text-neutral-300">In Progress</b> = solved
+                    once independently but not locked in (first pass, or needs another review);{" "}
+                    <b className="text-neutral-700 dark:text-neutral-300">Complete</b> = solved
+                    independently a second time.
+                  </p>
                 </div>
               </Menu>
             )}
