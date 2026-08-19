@@ -1,6 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
-import leetcodeData from "@/content/leetcode.json";
+// Client-safe types and pure helpers (no fs). Safe to import from Client Components.
+// Filesystem readers live in ./content.server.
 
 export type Difficulty = "Easy" | "Medium" | "Hard";
 
@@ -68,29 +67,7 @@ export type LogEntry = {
   leetcode?: LogProblem[];
 };
 
-/**
- * LeetCode problems, ordered by episode. Array.sort is stable, so problems
- * within the same episode keep their file order (which follows the 0x3f plan:
- * examples before homework).
- */
-export function getLeetcode(): LeetcodeContent {
-  const data = leetcodeData as LeetcodeContent;
-  const problems = [...data.problems].sort((a, b) => a.ep - b.ep);
-  return { ...data, problems };
-}
-
 /** The public problem-page URL, derived from the solution URL's slug. */
 export function problemUrl(slug: string): string {
   return `https://leetcode.com/problems/${slug}/`;
-}
-
-const LOG_DIR = path.join(process.cwd(), "content", "log");
-
-/** Daily log entries, newest first. Read from content/log/*.json at build time. */
-export function getLog(): LogEntry[] {
-  const files = fs.readdirSync(LOG_DIR).filter((f) => f.endsWith(".json"));
-  const entries = files.map(
-    (f) => JSON.parse(fs.readFileSync(path.join(LOG_DIR, f), "utf8")) as LogEntry,
-  );
-  return entries.sort((a, b) => b.date.localeCompare(a.date));
 }
