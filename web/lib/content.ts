@@ -21,6 +21,15 @@ export type LeetcodeContent = {
   problems: Problem[];
 };
 
+/** A LeetCode problem solved on a given day, linked from the daily log. */
+export type LogProblem = {
+  id: number;
+  slug: string;
+  title: string;
+  /** Optional link to Lia's own solution write-up */
+  solutionUrl?: string;
+};
+
 export type LogEntry = {
   /** ISO date, YYYY-MM-DD */
   date: string;
@@ -28,10 +37,12 @@ export type LogEntry = {
   week: string;
   /** Checked-off items for the day */
   done: string[];
-  /** One-line completion summary (Lia writes this); null if none */
+  /** One-line completion summary (may be 中英混杂 — daily-log notes are not forced to English); null if none */
   summary: string | null;
-  /** One-line summary of a notes day (from Obsidian); null if none */
+  /** One-line summary of a notes day (from Obsidian; language preserved as-is); null if none */
   note: string | null;
+  /** LeetCode problems done this day — kept in the log, linked out to LeetCode */
+  leetcode?: LogProblem[];
 };
 
 /** LeetCode problems, sorted by episode order then problem number. */
