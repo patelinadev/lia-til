@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Reveal from "@/app/components/Reveal";
 import applicationsData from "@/content/applications.json";
 import type { ApplicationsData } from "@/lib/content";
 
@@ -28,14 +29,14 @@ function sum(statuses: string[]): number {
   return statuses.reduce((n, s) => n + (data.byStatus[s] ?? 0), 0);
 }
 
-function shortDate(iso: string): string {
-  const [, m, d] = iso.split("-");
-  return `${Number(m)}/${Number(d)}`;
+function formatDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${m}/${d}/${y}`;
 }
 
 export default function ApplicationsPage() {
-  const maxDay = Math.max(...data.byDate.map((d) => d.count), 1);
   const groups = GROUPS.filter((g) => g.label === "In review" || sum(g.statuses) > 0);
+  const days = [...data.byDate].reverse(); // newest first
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-12 sm:py-16">
@@ -74,27 +75,38 @@ export default function ApplicationsPage() {
         ))}
       </div>
 
-      {/* over time */}
-      <section className="mt-8">
-        <h2 className="mb-4 text-lg font-semibold">Applications over time</h2>
-        <div className="rounded-xl border border-neutral-200 p-5 dark:border-neutral-800">
-          <div className="flex items-end justify-between gap-2" style={{ height: 160 }}>
-            {data.byDate.map((d) => (
-              <div key={d.date} className="flex flex-1 flex-col items-center justify-end gap-2">
-                <span className="text-xs tabular-nums text-neutral-500">{d.count}</span>
-                <div
-                  className="w-full rounded-t bg-blue-500/80 dark:bg-blue-400/70"
-                  style={{ height: `${(d.count / maxDay) * 120}px` }}
-                  title={`${d.date}: ${d.count}`}
-                />
-                <span className="text-xs tabular-nums text-neutral-400">{shortDate(d.date)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* over time — vertical timeline, newest first, scroll for the full history */}
+      <section className="mt-10">
+        <h2 className="mb-6 text-lg font-semibold">Applications over time</h2>
+        <ol className="relative">
+          {/* the trunk */}
+          <span
+            aria-hidden
+            className="absolute bottom-2 left-2 top-2 w-px bg-neutral-200 dark:bg-neutral-800"
+          />
+
+          {days.map((d, i) => (
+            <li key={d.date} className="relative pb-8 pl-10 last:pb-0">
+              {/* node dot on the trunk */}
+              <span
+                aria-hidden
+                className="absolute left-2 top-1.5 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-neutral-400 bg-white ring-4 ring-white dark:border-neutral-500 dark:bg-neutral-950 dark:ring-neutral-950"
+              />
+              <Reveal delay={Math.min(i, 8) * 50}>
+                <p className="font-mono text-sm text-neutral-500">{formatDate(d.date)}</p>
+                <p className="mt-1">
+                  <span className="text-2xl font-semibold tabular-nums">{d.count}</span>{" "}
+                  <span className="text-sm text-neutral-500">
+                    application{d.count === 1 ? "" : "s"}
+                  </span>
+                </p>
+              </Reveal>
+            </li>
+          ))}
+        </ol>
       </section>
 
-      <p className="mt-6 text-xs text-neutral-400">
+      <p className="mt-8 text-xs text-neutral-400">
         Aggregate counts only — no company names, roles, or other details.
       </p>
     </main>
