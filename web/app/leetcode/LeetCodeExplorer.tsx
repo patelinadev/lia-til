@@ -3,12 +3,17 @@
 import { useMemo, useState } from "react";
 import {
   problemUrl,
+  topicHue,
   STATUS_CATEGORY,
   type Problem,
   type Difficulty,
   type Status,
   type StatusCategory,
 } from "@/lib/content";
+
+function hueStyle(topic: string): React.CSSProperties {
+  return { ["--topic-h" as string]: topicHue(topic) } as React.CSSProperties;
+}
 
 const DIFFICULTY_ORDER: Record<Difficulty, number> = { Easy: 0, Medium: 1, Hard: 2 };
 const ALL_DIFFICULTIES: Difficulty[] = ["Easy", "Medium", "Hard"];
@@ -57,10 +62,12 @@ function toggle<T>(set: Set<T>, value: T): Set<T> {
 function Chip({
   active,
   onClick,
+  hue,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  hue?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -68,12 +75,18 @@ function Chip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
         active
           ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
           : "border-neutral-300 text-neutral-600 hover:border-neutral-500 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-500"
       }`}
     >
+      {hue !== undefined && (
+        <span
+          className="topic-dot h-2 w-2 rounded-full"
+          style={{ ["--topic-h" as string]: hue } as React.CSSProperties}
+        />
+      )}
       {children}
     </button>
   );
@@ -138,7 +151,12 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
       <div className="mb-5 flex flex-col gap-3 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
         <FilterRow label="Topic">
           {allTopics.map((t) => (
-            <Chip key={t} active={topics.has(t)} onClick={() => setTopics(toggle(topics, t))}>
+            <Chip
+              key={t}
+              active={topics.has(t)}
+              hue={topicHue(t)}
+              onClick={() => setTopics(toggle(topics, t))}
+            >
               {t}
             </Chip>
           ))}
@@ -229,7 +247,8 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
                     {p.topics.map((t) => (
                       <span
                         key={t}
-                        className="whitespace-nowrap rounded-md bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                        className="topic-tag whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium"
+                        style={hueStyle(t)}
                       >
                         {t}
                       </span>

@@ -71,3 +71,68 @@ export type LogEntry = {
 export function problemUrl(slug: string): string {
   return `https://leetcode.com/problems/${slug}/`;
 }
+
+/**
+ * Canonical topic taxonomy (display form). Order defines each topic's color:
+ * hues are spread by the golden angle off the list index, so neighbours in the
+ * list still get well-separated colors. Match is case-insensitive.
+ */
+export const TOPIC_LIST = [
+  "Set",
+  "Array",
+  "Hash Table",
+  "Matrix",
+  "Graph",
+  "Stack",
+  "Queue",
+  "Monotonic Stack",
+  "Trie",
+  "Linked List",
+  "Binary Tree",
+  "Iterator",
+  "Heap",
+  "Binary Search",
+  "Sorting",
+  "Quick Select",
+  "BFS",
+  "DFS",
+  "Topological Sort",
+  "Backtrack",
+  "Multiple Pointers",
+  "Recursion",
+  "Two Pointers",
+  "Sliding Window",
+  "Intervals",
+  "String",
+  "Prefix Sum",
+  "Palindrome",
+  "Design",
+  "Dynamic Programming",
+  "Greedy",
+  "Knapsack",
+  "Math",
+  "Sums",
+  "OOP",
+  "Union Find",
+  "Sweep Line",
+  "Binary Indexed Tree & Segment Tree",
+  "Data Structure",
+  "Grammar",
+  "Island",
+] as const;
+
+const TOPIC_INDEX = new Map(TOPIC_LIST.map((t, i) => [t.toLowerCase(), i]));
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** A stable, well-separated hue (0–359) for a topic tag's color. */
+export function topicHue(topic: string): number {
+  const key = topic.trim().toLowerCase();
+  const known = TOPIC_INDEX.get(key);
+  const n = known ?? TOPIC_LIST.length + (hashString(key) % 211);
+  return Math.round((n * 137.508) % 360);
+}
