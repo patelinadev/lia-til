@@ -2,8 +2,8 @@
   "date": "2026-08-11",
   "week": "W33",
   "done": [
-    "Backend 项目 Day 2：sync API + Docker MVP",
-    "投递简历 10 份"
+    "Backend project Day 2: sync API + Docker MVP",
+    "Sent 10 applications"
   ],
   "summary": null,
   "note": "读代码三层缩放（抓大放小）；.env→环境变量→代码 的 config management；项目简历 bullet 写法",
