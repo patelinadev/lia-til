@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   problemUrl,
   topicHue,
@@ -10,10 +10,6 @@ import {
   type Status,
   type StatusCategory,
 } from "@/lib/content";
-
-function hueStyle(topic: string): React.CSSProperties {
-  return { ["--topic-h" as string]: topicHue(topic) } as React.CSSProperties;
-}
 
 const DIFFICULTY_ORDER: Record<Difficulty, number> = { Easy: 0, Medium: 1, Hard: 2 };
 const ALL_DIFFICULTIES: Difficulty[] = ["Easy", "Medium", "Hard"];
@@ -45,6 +41,7 @@ const STATUS_DESCRIPTIONS: Record<Status, string> = {
 };
 
 type SortKey = "id" | "difficulty" | "date";
+type Col = "topic" | "difficulty" | "status";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -57,6 +54,10 @@ function toggle<T>(set: Set<T>, value: T): Set<T> {
   if (next.has(value)) next.delete(value);
   else next.add(value);
   return next;
+}
+
+function hueStyle(topic: string): React.CSSProperties {
+  return { ["--topic-h" as string]: topicHue(topic) } as React.CSSProperties;
 }
 
 function Chip({
@@ -92,12 +93,25 @@ function Chip({
   );
 }
 
+/** A small count badge shown on a column header when that column has an active filter. */
+function Count({ n }: { n: number }) {
+  if (n === 0) return null;
+  return (
+    <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-neutral-900 px-1 text-[10px] font-semibold text-white dark:bg-white dark:text-neutral-900">
+      {n}
+    </span>
+  );
+}
+
 export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) {
   const [topics, setTopics] = useState<Set<string>>(new Set());
   const [diffs, setDiffs] = useState<Set<Difficulty>>(new Set());
   const [statuses, setStatuses] = useState<Set<Status>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const [openCol, setOpenCol] = useState<Col | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const allTopics = useMemo(
     () => Array.from(new Set(problems.flatMap((p) => p.topics))).sort(),
@@ -106,6 +120,28 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
 
   const anyFilter = topics.size > 0 || diffs.size > 0 || statuses.size > 0;
 
+  // close menu on scroll / resize so the fixed popover never drifts from its header
+  useEffect(() => {
+    if (!openCol) return;
+    const close = () => setOpenCol(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [openCol]);
+
+  function openMenu(col: Col, e: React.MouseEvent<HTMLElement>) {
+    if (openCol === col) {
+      setOpenCol(null);
+      return;
+    }
+    const r = e.currentTarget.getBoundingClientRect();
+    setPos({ top: r.bottom + 6, left: r.left });
+    setOpenCol(col);
+  }
+
   function clickSort(key: SortKey) {
     if (sortKey !== key) {
       setSortKey(key);
@@ -113,8 +149,13 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
     } else if (sortDir === "asc") {
       setSortDir("desc");
     } else {
-      setSortKey(null); // third click → back to default (episode order)
+      setSortKey(null);
     }
+  }
+
+  function sortArrow(key: SortKey) {
+    if (sortKey !== key) return "";
+    return sortDir === "asc" ? " ↑" : " ↓";
   }
 
   const view = useMemo(() => {
@@ -130,7 +171,6 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
       if (sortKey === "id") return (a.id - b.id) * dir;
       if (sortKey === "difficulty")
         return (DIFFICULTY_ORDER[a.difficulty] - DIFFICULTY_ORDER[b.difficulty]) * dir;
-      // date — always push unknown dates to the bottom
       if (!a.date && !b.date) return 0;
       if (!a.date) return 1;
       if (!b.date) return -1;
@@ -138,44 +178,15 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
     });
   }, [problems, topics, diffs, statuses, sortKey, sortDir]);
 
-  function sortArrow(key: SortKey) {
-    if (sortKey !== key) return "";
-    return sortDir === "asc" ? " ↑" : " ↓";
-  }
-
-  const sortableHeader = "cursor-pointer select-none font-medium hover:text-neutral-800 dark:hover:text-neutral-200";
+  const thSort =
+    "cursor-pointer select-none font-medium hover:text-neutral-800 dark:hover:text-neutral-200";
+  const thFilter =
+    "inline-flex items-center gap-0.5 font-medium hover:text-neutral-800 dark:hover:text-neutral-200";
 
   return (
     <div>
-      {/* filters */}
-      <div className="mb-5 flex flex-col gap-3 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-        <FilterRow label="Topic">
-          {allTopics.map((t) => (
-            <Chip
-              key={t}
-              active={topics.has(t)}
-              hue={topicHue(t)}
-              onClick={() => setTopics(toggle(topics, t))}
-            >
-              {t}
-            </Chip>
-          ))}
-        </FilterRow>
-        <FilterRow label="Difficulty">
-          {ALL_DIFFICULTIES.map((d) => (
-            <Chip key={d} active={diffs.has(d)} onClick={() => setDiffs(toggle(diffs, d))}>
-              {d}
-            </Chip>
-          ))}
-        </FilterRow>
-        <FilterRow label="Status">
-          {STATUS_GROUPS.flatMap((g) => g.statuses).map((s) => (
-            <Chip key={s} active={statuses.has(s)} onClick={() => setStatuses(toggle(statuses, s))}>
-              {s}
-            </Chip>
-          ))}
-        </FilterRow>
-        <div className="flex items-center gap-3 text-xs text-neutral-500">
+      {(anyFilter || sortKey) && (
+        <div className="mb-3 flex items-center gap-3 text-xs text-neutral-500">
           <span>
             Showing {view.length} of {problems.length}
           </span>
@@ -193,7 +204,7 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
             </button>
           )}
         </div>
-      </div>
+      )}
 
       {/* table */}
       <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
@@ -201,24 +212,53 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
           <thead>
             <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">
               <th className="px-4 py-3">
-                <button type="button" onClick={() => clickSort("id")} className={sortableHeader}>
+                <button type="button" onClick={() => clickSort("id")} className={thSort}>
                   #{sortArrow("id")}
                 </button>
               </th>
               <th className="px-4 py-3 font-medium">Problem</th>
-              <th className="px-4 py-3 font-medium">Topic</th>
               <th className="px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => clickSort("difficulty")}
-                  className={sortableHeader}
-                >
-                  Difficulty{sortArrow("difficulty")}
+                <button type="button" onClick={(e) => openMenu("topic", e)} className={thFilter}>
+                  Topic
+                  <Count n={topics.size} />
+                  <span aria-hidden className="text-[10px]">
+                    ▾
+                  </span>
                 </button>
               </th>
-              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3">
+                <span className="inline-flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => clickSort("difficulty")}
+                    className={thSort}
+                  >
+                    Difficulty{sortArrow("difficulty")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => openMenu("difficulty", e)}
+                    className={thFilter}
+                    aria-label="Filter by difficulty"
+                  >
+                    <Count n={diffs.size} />
+                    <span aria-hidden className="text-[10px]">
+                      ▾
+                    </span>
+                  </button>
+                </span>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" onClick={(e) => openMenu("status", e)} className={thFilter}>
+                  Status
+                  <Count n={statuses.size} />
+                  <span aria-hidden className="text-[10px]">
+                    ▾
+                  </span>
+                </button>
+              </th>
               <th className="whitespace-nowrap px-4 py-3">
-                <button type="button" onClick={() => clickSort("date")} className={sortableHeader}>
+                <button type="button" onClick={() => clickSort("date")} className={thSort}>
                   Date{sortArrow("date")}
                 </button>
               </th>
@@ -299,6 +339,63 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
         </table>
       </div>
 
+      {/* column filter menus (fixed-positioned so the table's overflow can't clip them) */}
+      {openCol && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpenCol(null)} />
+          <div
+            className="fixed z-50 min-w-52 max-w-72 rounded-xl border border-neutral-200 bg-white p-3 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+            style={{ top: pos.top, left: pos.left }}
+          >
+            {openCol === "topic" && (
+              <Menu
+                title="Filter by topic"
+                onClear={topics.size ? () => setTopics(new Set()) : undefined}
+              >
+                {allTopics.map((t) => (
+                  <Chip
+                    key={t}
+                    active={topics.has(t)}
+                    hue={topicHue(t)}
+                    onClick={() => setTopics(toggle(topics, t))}
+                  >
+                    {t}
+                  </Chip>
+                ))}
+              </Menu>
+            )}
+            {openCol === "difficulty" && (
+              <Menu
+                title="Filter by difficulty"
+                onClear={diffs.size ? () => setDiffs(new Set()) : undefined}
+              >
+                {ALL_DIFFICULTIES.map((d) => (
+                  <Chip key={d} active={diffs.has(d)} onClick={() => setDiffs(toggle(diffs, d))}>
+                    {d}
+                  </Chip>
+                ))}
+              </Menu>
+            )}
+            {openCol === "status" && (
+              <Menu
+                title="Filter by status"
+                onClear={statuses.size ? () => setStatuses(new Set()) : undefined}
+              >
+                {STATUS_GROUPS.flatMap((g) => g.statuses).map((s) => (
+                  <Chip
+                    key={s}
+                    active={statuses.has(s)}
+                    onClick={() => setStatuses(toggle(statuses, s))}
+                  >
+                    {s}
+                  </Chip>
+                ))}
+              </Menu>
+            )}
+          </div>
+        </>
+      )}
+
       {/* status legend */}
       <div className="mt-5 rounded-xl border border-neutral-200 p-4 text-sm dark:border-neutral-800">
         <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-500">
@@ -328,13 +425,32 @@ export default function LeetCodeExplorer({ problems }: { problems: Problem[] }) 
   );
 }
 
-function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+function Menu({
+  title,
+  onClear,
+  children,
+}: {
+  title: string;
+  onClear?: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="w-20 shrink-0 text-xs font-medium uppercase tracking-wide text-neutral-500">
-        {label}
-      </span>
-      {children}
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+          {title}
+        </span>
+        {onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs text-neutral-500 underline hover:text-neutral-800 dark:hover:text-neutral-300"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );
 }
