@@ -52,6 +52,19 @@ export default function Home() {
             &rarr;
           </span>
         </Link>
+
+        <Link
+          href="/system-design"
+          className="group flex items-center justify-between rounded-xl border border-neutral-200 px-5 py-4 text-left transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600"
+        >
+          <span>
+            <span className="block font-semibold">System Design</span>
+            <span className="block text-sm text-neutral-500">Notes by deck</span>
+          </span>
+          <span className="text-neutral-400 transition-transform group-hover:translate-x-0.5">
+            &rarr;
+          </span>
+        </Link>
       </nav>
     </main>
   );
