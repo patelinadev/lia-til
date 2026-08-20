@@ -854,6 +854,14 @@ Instance Type   = Free</pre>
     <details><summary><span class="q">Q3</span>I get "denied" even though it's me</summary><div class="a"><code>ALLOWED_GITHUB_LOGIN</code> must equal your GitHub username exactly (case doesn't matter). Fix it on Vercel and redeploy.</div></details>
     <details><summary><span class="q">Q4</span><code>/api/auth/login</code> returns a 500</summary><div class="a"><code>GITHUB_CLIENT_ID</code> isn't set on Vercel yet, or the deploy predates adding it — redeploy after setting the vars.</div></details>
     <details><summary><span class="q">Q5</span>I set the vars but still get <code>{"error":"GITHUB_CLIENT_ID not set"}</code></summary><div class="a"><b>The #1 gotcha.</b> Vercel bakes env vars into a deployment <b>at deploy time</b> — a deployment that was already running when you added the var does NOT see it. Fix: after adding/changing any var, <b>Redeploy</b> (Deployments → latest → ⋯ → Redeploy), then retry. Also make sure the var is on <b>Vercel</b> (the frontend), not Render — the "not set" error comes from the Next app, so Render env vars don't help it. Frontend vars → Vercel; backend's <code>BACKEND_SECRET</code> → Render.</div></details>
+
+    <div class="phase" style="margin-top:28px"><span class="phase__k">+</span><h3>Extended — private area buildout (v0.5.1)</h3></div>
+    <p class="phase__note">Turned <code>/private</code> from one applications page into a real, navigable area.</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Routes</span><div><code>/private</code> is now a <b>hub</b> → <code>/private/applications</code> (the full ledger, moved here) + <code>/private/daily-log</code> (<b>new</b>). Each page calls <code>requireAdmin()</code> itself (not a layout gate — the auth docs warn layouts don't re-check on navigation).</div></div>
+      <div class="rb__row"><span class="rb__n">Private daily log</span><div><code>GET /api/daily-log/full</code> — the same shared-secret gate as applications; a private channel that serves the day-by-day log. <b>Decision (option B):</b> it carries the curated fields for now; the truly-private per-day sections (Success Diary / PhD / personal) arrive in <b>S5</b> when Obsidian wires straight to the backend — so nothing private is hand-fed in the meantime.</div></div>
+      <div class="rb__row"><span class="rb__n">Site-wide nav</span><div><code>web/app/components/AdminNav.tsx</code> — a slim top bar rendered <b>only for the signed-in owner</b> (via <code>currentAdmin()</code>), added to the root layout in <code>&lt;Suspense&gt;</code> so it never blocks the page. It links every public section + the private views + sign-out, so after login you hop freely between the public site and the private area. Public visitors see nothing.</div></div>
+    </div>
   </section>
 
   <!-- ============================ VERSION HISTORY ============================ -->
@@ -868,6 +876,7 @@ Instance Type   = Free</pre>
         <tr><td class="v">v0.3.0</td><td>P2 · S1 — FastAPI (Render) + Postgres (Neon); Applications served live via the aggregate API (dynamic, no rebuild)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.4.0</td><td>P2 · S2 — instant sync for all content: Daily Log · LeetCode · System Design each moved to the backend (table + endpoint + importer + dynamic page)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.0</td><td>P2 · S3 — GitHub login (custom OAuth + jose session) + private <code>/private</code> full-ledger view; backend private endpoint behind a shared secret</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.5.1</td><td>P2 · S3+ — private area buildout: <code>/private</code> hub + <code>/private/daily-log</code> (private channel) + a signed-in-only site-wide nav to hop between public &amp; private</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.x+</td><td>Phase 2 rest — S4 admin editor (Markdown live-preview) · S5 retire local sources / scheduled sync</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
