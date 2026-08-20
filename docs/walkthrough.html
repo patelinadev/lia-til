@@ -247,7 +247,7 @@
     <a href="#s1"><span class="st">P1·S1</span> First Deploy <span class="dot dot--go"></span></a>
     <a href="#s2"><span class="st">P1·S2</span> Sections + Daily Log <span class="dot dot--go"></span></a>
     <a href="#p2"><span class="st">Phase 2</span> Cloud Backend <span class="dot dot--you"></span></a>
-    <a href="#p2s1"><span class="st">P2·S1</span> Backend + Apps <span class="dot dot--you"></span></a>
+    <a href="#p2s1"><span class="st">P2·S1</span> Backend + Apps <span class="dot dot--go"></span></a>
   </div>
 
   <div class="legend">
@@ -528,7 +528,7 @@ git push origin v0.2.0</pre>
       <table class="ver">
         <thead><tr><th>Stage</th><th>What</th><th>Status</th></tr></thead>
         <tbody>
-          <tr><td class="v">S1</td><td>Backend skeleton + Applications (Neon + Render + public aggregate endpoint)</td><td>🔨 Next — detailed below</td></tr>
+          <tr><td class="v">S1</td><td>Backend skeleton + Applications (Neon + Render + public aggregate endpoint)</td><td>✅ Done (v0.3.0)</td></tr>
           <tr><td class="v">S2</td><td>GitHub login + private full-applications view</td><td>🗺️ Planned</td></tr>
           <tr><td class="v">S3</td><td>Admin buffer (Markdown live-preview editor) + daily-log migration</td><td>🗺️ Planned</td></tr>
           <tr><td class="v">S4</td><td>Claude write-API + daily cloud scheduled sync</td><td>🗺️ Planned</td></tr>
@@ -544,8 +544,8 @@ git push origin v0.2.0</pre>
     <div class="stage__head">
       <span class="badge">P2 · S1</span>
       <h2>Backend skeleton + Applications</h2>
-      <span class="status status--wip">🔨 Next</span>
-      <span class="stage__ver">v0.3.0 (target)</span>
+      <span class="status status--done">✅ Done</span>
+      <span class="stage__ver">v0.3.0</span>
     </div>
     <p class="goal">Stand up FastAPI on Render backed by Neon Postgres, serving a <b>public aggregate</b> endpoint that <code>/applications</code> reads at request time. Same walking-skeleton idea as P1·S1 — prove <code>client → server → DB → deploy</code> before adding features.</p>
 
@@ -676,7 +676,8 @@ Instance Type   = Free</pre>
         <tr><td class="v">v0.1.0</td><td>P1 · S1 — First Deploy (Next.js + Vercel auto-deploy pipeline)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.2.0</td><td>P1 · S2 core — section routes + LeetCode table (filter/sort/status/colored topics) + curated Daily Log</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.2.x</td><td>P1 · S2 wrap-up — anonymized Applications dashboard + calendar · System Design tree + per-deck detail pages · "Today I Learned" home + footer</td><td>✅ Done</td></tr>
-        <tr><td class="v">v0.3.x</td><td>Phase 2 — cloud backend (FastAPI + Postgres) · login + private views · admin editor · daily scheduled sync</td><td>🗺️ Planned</td></tr>
+        <tr><td class="v">v0.3.0</td><td>P2 · S1 — FastAPI (Render) + Postgres (Neon); Applications served live via the aggregate API (dynamic, no rebuild)</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.3.x</td><td>Phase 2 rest — login + private views · admin editor · daily scheduled sync</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
   </div>
