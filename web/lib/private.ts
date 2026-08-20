@@ -24,3 +24,27 @@ export async function getFullApplications(): Promise<FullApplication[]> {
   const data = (await res.json()) as { applications: FullApplication[] };
   return data.applications ?? [];
 }
+
+export type FullDailyLogEntry = {
+  date: string;
+  week: string | null;
+  done: string[];
+  summary: string | null;
+  note: string | null;
+  leetcode: { id: number; slug?: string; title?: string; solutionUrl?: string | null }[];
+};
+
+/** Fetch the full daily log from the backend's private endpoint (secret-gated).
+ * Called only after the admin session is verified. */
+export async function getFullDailyLog(): Promise<FullDailyLogEntry[]> {
+  const base = process.env.API_URL?.replace(/\/$/, "");
+  const secret = process.env.BACKEND_SECRET;
+  if (!base || !secret) return [];
+  const res = await fetch(`${base}/api/daily-log/full`, {
+    headers: { "x-admin-secret": secret },
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { entries: FullDailyLogEntry[] };
+  return data.entries ?? [];
+}

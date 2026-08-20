@@ -162,10 +162,10 @@ def system_design():
     return {"decks": decks}
 
 
-@app.get("/api/daily-log")
-def daily_log():
-    """Curated daily-log entries, newest first. LeetCode items are enriched with
-    their solution URL from the leetcode table (single source)."""
+def _daily_log_entries():
+    """Daily-log entries newest-first, LeetCode items enriched with their
+    solution URL from the leetcode table (single source). Shared by the public
+    and the private (authenticated) endpoints."""
     if SessionLocal is None:
         return []
     with SessionLocal() as session:
@@ -189,3 +189,17 @@ def daily_log():
             }
             for r in rows
         ]
+
+
+@app.get("/api/daily-log")
+def daily_log():
+    """Public — the curated daily-log entries (checked items + one-line summary)."""
+    return _daily_log_entries()
+
+
+@app.get("/api/daily-log/full", dependencies=[Depends(require_admin)])
+def daily_log_full():
+    """PRIVATE — the daily log through the authenticated channel. Same curated
+    fields today; the full private per-day sections will land here (behind the
+    shared secret) once wired. Gated by X-Admin-Secret (fail-closed)."""
+    return {"entries": _daily_log_entries()}
