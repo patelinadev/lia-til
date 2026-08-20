@@ -86,7 +86,7 @@ export default async function DailyLogPage() {
               {entry.leetcode && entry.leetcode.length > 0 && (
                 <ul className="mt-3 flex flex-wrap gap-2">
                   {entry.leetcode.map((p) => {
-                    const solution = solutionById.get(p.id) ?? p.solutionUrl ?? null;
+                    const solution = p.solutionUrl ?? solutionById.get(p.id) ?? null;
                     return (
                       <li
                         key={p.slug}

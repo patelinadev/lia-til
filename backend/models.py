@@ -18,6 +18,21 @@ class Application(Base):
     notes = Column(Text)
 
 
+class LeetcodeProblem(Base):
+    __tablename__ = "leetcode_problems"
+
+    id = Column(Integer, primary_key=True)  # LeetCode problem number
+    seq = Column(Integer)  # preserves the 0x3f plan order within an episode
+    slug = Column(String(120))
+    title = Column(Text)
+    topics = Column(JSON)  # list[str]
+    ep = Column(Integer)
+    difficulty = Column(String(10))
+    status = Column(String(30))
+    date = Column(String(10))  # last completion, nullable
+    solution_url = Column(Text)  # nullable
+
+
 class DailyLog(Base):
     """One curated public entry per day (checked items + one-line summary/note).
     Private sections (Success Diary / PhD / etc.) are NOT stored here yet — they
