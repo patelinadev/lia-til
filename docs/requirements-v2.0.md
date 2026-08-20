@@ -71,16 +71,17 @@
 
 ## 4. 开发计划（walking skeleton，逐 Stage）
 
-**排序原则：先有数据源 + 读路径 → 再有鉴权（后面都依赖它）→ 再有手动编辑与日志 → 最后接自动化。**
+**排序原则：先有数据源 + 读路径（S1）→ 全内容即时同步（S2）→ 鉴权（S3）→ 手动编辑（S4）→ 退休本地源头（S5）。先拿 80% 的价值，最硬的留最后。**
 
 | Stage | 做什么 | 点亮 |
 |---|---|---|
-| **P2·S1 — 后端骨架 + 投递** | Render 起 FastAPI + Neon 建 Postgres；`applications` 表 + importer 导入 ledger；公开聚合端点；网站 Applications 改成读它 | 打通 `client→server→DB→deploy`，Python 后端 + DB 简历线 |
-| **P2·S2 — 登录 + 私有查看** | GitHub OAuth；私有端点 + 私有页（全量投递）；服务端鉴权 | 你的核心私有需求 + auth 基座 |
-| **P2·S3 — 后台 buffer + 日志迁移** | 后台管理界面（投递增改 + 学习日志 **Markdown 编辑器实时预览**）；`daily_logs` 表 + 迁 Obsidian 日志；公开时间线改读后端策展子集 | 你能手动改 + 日志上网 |
-| **P2·S4 — Claude 写 API + 定时同步** | 写端点让 Claude 经 API 录入；云端定时任务每天抓取更新，任何地方可跑 | DevOps / 调度线，闭环 |
+| **P2·S1 — 后端骨架 + 投递** ✅ | Render 起 FastAPI + Neon 建 Postgres；`applications` 表 + importer；公开聚合端点；网站 Applications 读它（dynamic） | Python 后端 + DB 简历线（已完成 `v0.3.0`） |
+| **P2·S2 — 全内容即时同步** | LeetCode + Daily Log + System Design 各建一张表 + importer 灌现有内容 + **公开端点** + 页面改 dynamic；机制照搬 applications。更新 = 我跑 importer/写后端 → 即时可见，不 push/rebuild | 网站永远是最新的 |
+| **P2·S3 — 登录 + 私有查看** | GitHub OAuth（只放行 patelinadev）；私有端点 + 私有页（全量投递 + 全量日志）；服务端鉴权 | 私有需求 + auth 基座 |
+| **P2·S4 — 后台 buffer** | 私有 `/admin`：学习日志 **Markdown 实时预览编辑器** + 各表编辑表单；你能自己手动改 | 不 100% 依赖 Claude |
+| **P2·S5 — 本地源头退休** | 加写 API；改造 daily-planner / learning-log / 简历 ledger 工作流直接读写后端；Obsidian + `jd-based-resume` 文件退休 | 彻底单一源头、无本地文件、可云端定时同步 |
 
-（LeetCode 数据迁移不急，可放 S3 或之后；S1 先只做投递这条最干净的线。）
+（S2 三个内容里 **System Design 最复杂**：deck→slide 嵌套 + 图；文字进库、diagram key 进库、图的组件留代码。先做 daily log，再 LeetCode，再 SD。）
 
 ---
 
@@ -90,7 +91,9 @@
 - **网站读后端 = 运行时抓取（dynamic / SSR）** —— 数据页每次打开从后端现取最新，「打开即最新、写完刷新即见」，**不再靠 push/重建**。
 - **后台管理 = Next.js 私有路由页** —— 同一个 app，登录后才可见的 `/admin` 页（不做独立 admin 应用）。
 - **「简历」= 投递里的 `Resume` 字段** —— 随 applications 在 **S1 一起迁**，不单独排。
-- **LeetCode 迁移单独排在后面**（S1 只做投递这条最干净的线；LeetCode 放 S3 之后）。
+- **即时同步优先，login 往后放**（2026-08-19 改）：S2 先把 LeetCode + Daily Log + System Design 全做成即时同步（照搬 applications），login 挪到 S3。
+- **S2 只开公开端点**：没有 login 之前，公开端点只给**策展/聚合版**（daily log 只给勾选项 + 一句话总结，不含 Success Diary / PhD 等私有段）；全量私有内容等 S3 login 后再放。
+- **"不动 Obsidian 工作流" 的代价 = Claude 每天多做一步**（curate → 写后端）；Lia 照常写 Obsidian，不写两遍。真正的"只写一处、Obsidian 退休" = S5。
 
 - **Host = Render（免费 web service）+ DB = Neon（免费 serverless Postgres）** —— 不用 Railway（已砍免费额度，付费对简历无增益）。平台名字不上简历，值钱的是 FastAPI + Postgres + API + auth 这些技能，且应用可移植（Phase 3 再搬 AWS）。
 

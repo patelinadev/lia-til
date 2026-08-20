@@ -248,6 +248,7 @@
     <a href="#s2"><span class="st">P1·S2</span> Sections + Daily Log <span class="dot dot--go"></span></a>
     <a href="#p2"><span class="st">Phase 2</span> Cloud Backend <span class="dot dot--you"></span></a>
     <a href="#p2s1"><span class="st">P2·S1</span> Backend + Apps <span class="dot dot--go"></span></a>
+    <a href="#p2s2"><span class="st">P2·S2</span> Instant sync <span class="dot dot--you"></span></a>
   </div>
 
   <div class="legend">
@@ -665,6 +666,63 @@ Instance Type   = Free</pre>
     <details><summary><span class="q">Q3</span>Database connection error</summary><div class="a">Neon needs <code>sslmode=require</code> (already in the string). Make sure <code>DATABASE_URL</code> in Render exactly matches Neon's.</div></details>
     <details><summary><span class="q">Q4</span>CORS error</summary><div class="a">We fetch the API <b>server-side</b> (Next.js), so the browser never calls Render directly — no CORS. (If we ever call it from the browser later, add CORS on FastAPI.)</div></details>
     <details><summary><span class="q">Q5</span>Is my full application data safe on a public URL?</summary><div class="a">Yes — Neon holds the full data <b>privately</b>; only <code>/summary</code> (counts) is public. Full detail comes behind login in <b>S2</b>.</div></details>
+  </section>
+
+  <!-- ============================ P2 · S2 ============================ -->
+  <section class="stage" id="p2s2">
+    <div class="stage__head">
+      <span class="badge">P2 · S2</span>
+      <h2>Instant sync — all content</h2>
+      <span class="status status--wip">🔨 In progress</span>
+      <span class="stage__ver">v0.3.x (target)</span>
+    </div>
+    <p class="goal">Make LeetCode, Daily Log, and System Design update live like Applications — each moves to the backend and the page reads it per request, so any change shows on the site with <b>no push / no rebuild</b>. Order: <b>Daily Log → LeetCode → System Design</b>.</p>
+
+    <div class="callout me"><span class="k">Same pattern ×3</span><span>Each content type gets: ① a backend table · ② an importer that loads the current content · ③ a public endpoint · ④ the page turned <code>dynamic</code>. Updating = I re-run the importer / write the backend → live. <b>No new Neon/Render setup</b> — S1's backend is reused.</span></div>
+
+    <div class="callout"><span class="k">Privacy</span><span>No login yet → the public endpoint serves only the <b>curated</b> daily log (checked items + one-line summary), never Success Diary / PhD / personal sections. Full private views come in <b>S3</b>.</span></div>
+
+    <div class="phase"><span class="phase__k">A</span><h3>Daily Log → backend (first)</h3></div>
+    <p class="phase__note">Almost all "me" this time — the DB + host already exist from S1.</p>
+    <ol class="timeline">
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · backend</span></div>
+          <h4>daily_logs table + endpoint + importer</h4>
+          <p>Add a <code>daily_logs</code> model, a public <code>GET /api/daily-log</code> (curated entries, newest first), and a daily-log importer that loads the current <code>content/log/*.json</code> into the DB. Push → Render auto-deploys.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · terminal</span></div>
+          <h4>Seed the daily logs</h4>
+          <p>Run the daily-log importer locally (reads your <code>backend/.env</code> DATABASE_URL) → loads the curated entries into Neon.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="me">
+        <div class="rail"><div class="marker">3</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--me">Me · site</span></div>
+          <h4>/daily-log becomes dynamic</h4>
+          <p>Point the timeline at <code>API_URL/api/daily-log</code> per request (fallback to the committed JSON). Push.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="verify">
+        <div class="rail"><div class="marker">4</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--go">Verify</span></div>
+          <h4>Live, no rebuild</h4>
+          <p>Open the deployed <code>/daily-log</code> → entries come from the DB. Add/change an entry → refresh → it updates with no git push. (You just glance at the page — no setup this time.)</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">B</span><h3>Then LeetCode, then System Design</h3></div>
+    <div class="card">
+      <p>Same four moves. <b>System Design is the richest</b> (deck→slide nesting; slide text + the diagram <em>key</em> go in the DB, the diagram components stay in code). Each gets its own detailed steps when we build it.</p>
+    </div>
   </section>
 
   <!-- ============================ VERSION HISTORY ============================ -->
