@@ -1,18 +1,37 @@
 import Link from "next/link";
 import Reveal from "@/app/components/Reveal";
 import { getLog, getLeetcode } from "@/lib/content.server";
+import type { LogEntry } from "@/lib/content";
 
 export const metadata = {
   title: "Daily Log · Lia's Learning Progress",
 };
+
+// Always render at request time so the timeline shows the latest data from the API.
+export const dynamic = "force-dynamic";
 
 function formatDate(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${m}/${d}/${y}`;
 }
 
-export default function DailyLogPage() {
-  const log = getLog();
+/** Fetch curated daily-log entries from the backend at request time; fall back
+ * to the committed files if API_URL is unset or the API is unreachable. */
+async function getDailyLog(): Promise<LogEntry[]> {
+  const base = process.env.API_URL?.replace(/\/$/, "");
+  if (base) {
+    try {
+      const res = await fetch(`${base}/api/daily-log`, { cache: "no-store" });
+      if (res.ok) return (await res.json()) as LogEntry[];
+    } catch {
+      // fall through to the committed snapshot
+    }
+  }
+  return getLog();
+}
+
+export default async function DailyLogPage() {
+  const log = await getDailyLog();
   // Single source for solution links: look them up from leetcode.json by id,
   // so adding a solution there auto-fills the daily log too.
   const solutionById = new Map(
