@@ -1,6 +1,7 @@
 import Link from "next/link";
 import fallbackData from "@/content/applications.json";
 import type { ApplicationsData } from "@/lib/content";
+import { fetchJsonWithRetry } from "@/lib/net";
 
 export const metadata = {
   title: "Applications · Lia's Learning Progress",
@@ -8,18 +9,17 @@ export const metadata = {
 
 // Always render at request time so the page shows the latest data from the API.
 export const dynamic = "force-dynamic";
+// Allow the request to wait out a cold backend start (Render free tier ~40s).
+export const maxDuration = 60;
 
 /** Fetch the aggregates from the backend at request time; fall back to the
- * committed JSON if API_URL is unset or the API is unreachable (e.g. cold start). */
+ * committed JSON only if API_URL is unset or the API stays unreachable through
+ * the retry budget (so a cold start no longer drops us to the stale snapshot). */
 async function getSummary(): Promise<ApplicationsData> {
   const base = process.env.API_URL?.replace(/\/$/, "");
   if (base) {
-    try {
-      const res = await fetch(`${base}/api/applications/summary`, { cache: "no-store" });
-      if (res.ok) return (await res.json()) as ApplicationsData;
-    } catch {
-      // fall through to the committed snapshot
-    }
+    const data = await fetchJsonWithRetry<ApplicationsData>(`${base}/api/applications/summary`);
+    if (data) return data;
   }
   return fallbackData as ApplicationsData;
 }
@@ -109,9 +109,8 @@ export default async function ApplicationsPage() {
         &larr; Learning Progress
       </Link>
 
-      <div className="mt-6 mb-8 flex flex-wrap items-baseline justify-between gap-3">
+      <div className="mt-6 mb-8">
         <h1 className="text-3xl font-bold sm:text-4xl">Applications</h1>
-        {data.updatedAt && <p className="text-sm text-neutral-500">Updated {data.updatedAt}</p>}
       </div>
 
       {/* hero total */}

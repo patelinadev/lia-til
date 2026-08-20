@@ -2,6 +2,7 @@ import Link from "next/link";
 import Reveal from "@/app/components/Reveal";
 import { getLog, getLeetcode } from "@/lib/content.server";
 import type { LogEntry } from "@/lib/content";
+import { fetchJsonWithRetry } from "@/lib/net";
 
 export const metadata = {
   title: "Daily Log · Lia's Learning Progress",
@@ -9,6 +10,8 @@ export const metadata = {
 
 // Always render at request time so the timeline shows the latest data from the API.
 export const dynamic = "force-dynamic";
+// Allow the request to wait out a cold backend start (Render free tier ~40s).
+export const maxDuration = 60;
 
 function formatDate(iso: string): string {
   const [y, m, d] = iso.split("-");
@@ -16,16 +19,13 @@ function formatDate(iso: string): string {
 }
 
 /** Fetch curated daily-log entries from the backend at request time; fall back
- * to the committed files if API_URL is unset or the API is unreachable. */
+ * to the committed files only if API_URL is unset or the API stays unreachable
+ * through the retry budget (so a cold start no longer drops us to the snapshot). */
 async function getDailyLog(): Promise<LogEntry[]> {
   const base = process.env.API_URL?.replace(/\/$/, "");
   if (base) {
-    try {
-      const res = await fetch(`${base}/api/daily-log`, { cache: "no-store" });
-      if (res.ok) return (await res.json()) as LogEntry[];
-    } catch {
-      // fall through to the committed snapshot
-    }
+    const data = await fetchJsonWithRetry<LogEntry[]>(`${base}/api/daily-log`);
+    if (data) return data;
   }
   return getLog();
 }
