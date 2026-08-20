@@ -1,12 +1,28 @@
 import Link from "next/link";
-import applicationsData from "@/content/applications.json";
+import fallbackData from "@/content/applications.json";
 import type { ApplicationsData } from "@/lib/content";
 
 export const metadata = {
   title: "Applications · Lia's Learning Progress",
 };
 
-const data = applicationsData as ApplicationsData;
+// Always render at request time so the page shows the latest data from the API.
+export const dynamic = "force-dynamic";
+
+/** Fetch the aggregates from the backend at request time; fall back to the
+ * committed JSON if API_URL is unset or the API is unreachable (e.g. cold start). */
+async function getSummary(): Promise<ApplicationsData> {
+  const base = process.env.API_URL?.replace(/\/$/, "");
+  if (base) {
+    try {
+      const res = await fetch(`${base}/api/applications/summary`, { cache: "no-store" });
+      if (res.ok) return (await res.json()) as ApplicationsData;
+    } catch {
+      // fall through to the committed snapshot
+    }
+  }
+  return fallbackData as ApplicationsData;
+}
 
 // Group the known statuses into a funnel. We deliberately do NOT show an
 // "in review" count — an application's real state is unknown until it becomes
@@ -39,15 +55,15 @@ const GROUPS: { label: string; hint: string; statuses: string[]; className: stri
   },
 ];
 
-function sum(statuses: string[]): number {
-  return statuses.reduce((n, s) => n + (data.byStatus[s] ?? 0), 0);
+function sumStatuses(byStatus: Record<string, number>, statuses: string[]): number {
+  return statuses.reduce((n, s) => n + (byStatus[s] ?? 0), 0);
 }
 
-function breakdown(statuses: string[]): string {
-  const parts = statuses
-    .filter((s) => (data.byStatus[s] ?? 0) > 0)
-    .map((s) => `${s} ${data.byStatus[s]}`);
-  return parts.join(" · ");
+function breakdown(byStatus: Record<string, number>, statuses: string[]): string {
+  return statuses
+    .filter((s) => (byStatus[s] ?? 0) > 0)
+    .map((s) => `${s} ${byStatus[s]}`)
+    .join(" · ");
 }
 
 const MONTHS = [
@@ -76,9 +92,11 @@ function buildMonths(byDate: { date: string; count: number }[]) {
   });
 }
 
-export default function ApplicationsPage() {
-  // always show Heard back / Interviewing / Closed; show Offers only once there are any
-  const groups = GROUPS.filter((g) => g.label !== "Offers" || sum(g.statuses) > 0);
+export default async function ApplicationsPage() {
+  const data = await getSummary();
+  const groups = GROUPS.filter(
+    (g) => g.label !== "Offers" || sumStatuses(data.byStatus, g.statuses) > 0,
+  );
   const months = buildMonths(data.byDate);
   const maxDay = Math.max(...data.byDate.map((d) => d.count), 1);
 
@@ -93,9 +111,7 @@ export default function ApplicationsPage() {
 
       <div className="mt-6 mb-8 flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-3xl font-bold sm:text-4xl">Applications</h1>
-        {data.updatedAt && (
-          <p className="text-sm text-neutral-500">Updated {data.updatedAt}</p>
-        )}
+        {data.updatedAt && <p className="text-sm text-neutral-500">Updated {data.updatedAt}</p>}
       </div>
 
       {/* hero total */}
@@ -115,10 +131,10 @@ export default function ApplicationsPage() {
           >
             <p className="text-sm text-neutral-500">{g.label}</p>
             <p className={`mt-1 text-3xl font-semibold tabular-nums ${g.className}`}>
-              {sum(g.statuses)}
+              {sumStatuses(data.byStatus, g.statuses)}
             </p>
             <p className="mt-1 text-xs text-neutral-400">
-              {breakdown(g.statuses) || (g.hint ? g.hint : "none yet")}
+              {breakdown(data.byStatus, g.statuses) || (g.hint ? g.hint : "none yet")}
             </p>
           </div>
         ))}
@@ -139,10 +155,7 @@ export default function ApplicationsPage() {
               <p className="mb-3 text-sm font-medium">{month.label}</p>
               <div className="grid grid-cols-7 gap-1.5">
                 {WEEKDAYS.map((w) => (
-                  <div
-                    key={w}
-                    className="pb-1 text-center text-xs font-medium text-neutral-400"
-                  >
+                  <div key={w} className="pb-1 text-center text-xs font-medium text-neutral-400">
                     {w}
                   </div>
                 ))}
