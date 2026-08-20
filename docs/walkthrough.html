@@ -169,6 +169,19 @@
   pre.cmd { font-family: "IBM Plex Mono", monospace; font-size: 13px; background: var(--ink); color: #F4F5F7; padding: 12px 14px; border-radius: 10px; margin: 10px 0 4px; overflow-x: auto; line-height: 1.5; }
   pre.cmd .c { color: #8A94A0; }
 
+  /* rebuild runbook — one card per content type, four fixed artifacts each */
+  .rb { padding: 4px 16px; }
+  .rb__row { display: grid; grid-template-columns: 128px 1fr; gap: 16px; padding: 12px 0; border-top: 1px solid var(--border); align-items: start; }
+  .rb__row:first-child { border-top: 0; }
+  .rb__n { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: .04em; color: var(--ink-faint); padding-top: 2px; text-transform: uppercase; }
+  .rb__row > div { font-size: 14px; color: var(--ink-soft); }
+  .rb__row > div b { color: var(--ink); font-weight: 600; }
+  .rb pre.cmd { margin: 8px 0 2px; font-size: 12.5px; }
+  .rb__upd { margin: 4px 0 0; padding: 12px 0 2px; border-top: 1px dashed var(--border-strong); font-size: 13.5px; color: var(--ink-soft); }
+  .rb__upd b { color: var(--ink); }
+  .done { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--go); background: var(--go-bg); border: 1px solid var(--go-line); padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+  @media (max-width: 560px) { .rb__row { grid-template-columns: 1fr; gap: 4px; } }
+
   .callout { display: flex; gap: 10px; margin-top: 10px; padding: 10px 12px; background: var(--you-bg); border: 1px solid var(--you-line); border-radius: 10px; font-size: 13.5px; color: var(--ink); }
   .callout.me { background: var(--me-bg); border-color: var(--me-line); }
   .callout .k { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--you); font-weight: 500; flex: none; padding-top: 1px; }
@@ -248,7 +261,7 @@
     <a href="#s2"><span class="st">P1·S2</span> Sections + Daily Log <span class="dot dot--go"></span></a>
     <a href="#p2"><span class="st">Phase 2</span> Cloud Backend <span class="dot dot--you"></span></a>
     <a href="#p2s1"><span class="st">P2·S1</span> Backend + Apps <span class="dot dot--go"></span></a>
-    <a href="#p2s2"><span class="st">P2·S2</span> Instant sync <span class="dot dot--you"></span></a>
+    <a href="#p2s2"><span class="st">P2·S2</span> Instant sync <span class="dot dot--go"></span></a>
   </div>
 
   <div class="legend">
@@ -673,58 +686,49 @@ Instance Type   = Free</pre>
     <div class="stage__head">
       <span class="badge">P2 · S2</span>
       <h2>Instant sync — all content</h2>
-      <span class="status status--wip">🔨 In progress</span>
-      <span class="stage__ver">v0.3.x (target)</span>
+      <span class="status status--done">✅ Done</span>
+      <span class="stage__ver">v0.4.0</span>
     </div>
-    <p class="goal">Make LeetCode, Daily Log, and System Design update live like Applications — each moves to the backend and the page reads it per request, so any change shows on the site with <b>no push / no rebuild</b>. Order: <b>Daily Log → LeetCode → System Design</b>.</p>
+    <p class="goal">LeetCode, Daily Log, and System Design now update live like Applications — each one moved to the backend and its page reads it per request, so any change shows on the site with <b>no push / no rebuild</b>. Built in this order: <b>Daily Log → LeetCode → System Design</b>.</p>
 
-    <div class="callout me"><span class="k">Same pattern ×3</span><span>Each content type gets: ① a backend table · ② an importer that loads the current content · ③ a public endpoint · ④ the page turned <code>dynamic</code>. Updating = I re-run the importer / write the backend → live. <b>No new Neon/Render setup</b> — S1's backend is reused.</span></div>
+    <div class="callout me"><span class="k">The pattern (read this first)</span><span>Every content type is rebuilt from the <b>same four artifacts</b>: <b>① Table</b> in <code>backend/models.py</code> · <b>② Endpoint</b> in <code>backend/main.py</code> · <b>③ Importer</b> <code>backend/import_&lt;x&gt;.py</code> that loads a <code>web/content/…</code> file into the table · <b>④ Page</b> set to <code>force-dynamic</code> that fetches the endpoint (with the committed file as offline fallback). The three cards below fill in that template for each content type — same shape, different specifics. <b>No new Neon/Render setup</b>: S1's backend is reused.</span></div>
 
     <div class="callout"><span class="k">Privacy</span><span>No login yet → the public endpoint serves only the <b>curated</b> daily log (checked items + one-line summary), never Success Diary / PhD / personal sections. Full private views come in <b>S3</b>.</span></div>
 
-    <div class="callout me"><span class="k">Update flow (live now)</span><span><b>Applications · Daily Log · LeetCode are all live.</b> You finish something / send me a link → I curate &amp; run the matching importer (or write the backend) → your site reflects it on refresh, <b>no git push, no rebuild</b>. Obsidian and the ledger stay your originals — I'm the bridge until S5. Progress: Daily Log ✅ · LeetCode ✅ · System Design ⏳.</span></div>
+    <div class="callout me"><span class="k">Update flow (live now)</span><span><b>Applications · Daily Log · LeetCode · System Design are all live.</b> You finish something / send me a link or screenshot → I edit the matching <code>web/content/…</code> file &amp; run its importer → your site reflects it on refresh, <b>no git push, no rebuild</b>. Obsidian and the ledger stay your originals — I'm the bridge until S5.</span></div>
 
-    <div class="phase"><span class="phase__k">A</span><h3>Daily Log → backend (first)</h3></div>
-    <p class="phase__note">Almost all "me" this time — the DB + host already exist from S1.</p>
-    <ol class="timeline">
-      <li class="step" data-actor="me">
-        <div class="rail"><div class="marker">1</div></div>
-        <div class="card">
-          <div class="tags"><span class="tag tag--me">Me · backend</span></div>
-          <h4>daily_logs table + endpoint + importer</h4>
-          <p>Add a <code>daily_logs</code> model, a public <code>GET /api/daily-log</code> (curated entries, newest first), and a daily-log importer that loads the current <code>content/log/*.json</code> into the DB. Push → Render auto-deploys.</p>
-        </div>
-      </li>
-      <li class="step" data-actor="me">
-        <div class="rail"><div class="marker">2</div></div>
-        <div class="card">
-          <div class="tags"><span class="tag tag--me">Me · terminal</span></div>
-          <h4>Seed the daily logs</h4>
-          <p>Run the daily-log importer locally (reads your <code>backend/.env</code> DATABASE_URL) → loads the curated entries into Neon.</p>
-        </div>
-      </li>
-      <li class="step" data-actor="me">
-        <div class="rail"><div class="marker">3</div></div>
-        <div class="card">
-          <div class="tags"><span class="tag tag--me">Me · site</span></div>
-          <h4>/daily-log becomes dynamic</h4>
-          <p>Point the timeline at <code>API_URL/api/daily-log</code> per request (fallback to the committed JSON). Push.</p>
-        </div>
-      </li>
-      <li class="step" data-actor="verify">
-        <div class="rail"><div class="marker">4</div></div>
-        <div class="card">
-          <div class="tags"><span class="tag tag--go">Verify</span></div>
-          <h4>Live, no rebuild</h4>
-          <p>Open the deployed <code>/daily-log</code> → entries come from the DB. Add/change an entry → refresh → it updates with no git push. (You just glance at the page — no setup this time.)</p>
-        </div>
-      </li>
-    </ol>
+    <!-- ---- Runbook 1: Daily Log ---- -->
+    <div class="phase"><span class="phase__k">A</span><h3>Daily Log<span class="done">✅ live</span></h3></div>
+    <p class="phase__note">Powers <code>/daily-log</code>. Built first — the DB + host already existed from S1.</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">① Table</span><div>Added <code>DailyLog</code> to <code>backend/models.py</code> → table <code>daily_logs</code>, columns: <code>date</code> (PK, "YYYY-MM-DD") · <code>week</code> · <code>done</code> (JSON list) · <code>summary</code> · <code>note</code> · <code>leetcode</code> (JSON list of <code>{id, slug, title}</code>).</div></div>
+      <div class="rb__row"><span class="rb__n">② Endpoint</span><div>Added <code>GET /api/daily-log</code> to <code>backend/main.py</code>. Returns curated entries <b>newest-first</b>, and enriches each LeetCode item with its <code>solutionUrl</code> looked up from the <code>leetcode_problems</code> table — so the solution link has <b>one source</b>, not two.</div></div>
+      <div class="rb__row"><span class="rb__n">③ Importer</span><div>Wrote <code>backend/import_daily_log.py</code> — reads every <code>web/content/log/*.json</code> and upserts it into the table. Run locally (reads <code>DATABASE_URL</code> from <code>backend/.env</code>):<pre class="cmd">cd backend &amp;&amp; source .venv/bin/activate &amp;&amp; python import_daily_log.py</pre></div></div>
+      <div class="rb__row"><span class="rb__n">④ Page</span><div>Set <code>web/app/daily-log/page.tsx</code> to <code>export const dynamic = "force-dynamic"</code> and made it <code>fetch(`${API_URL}/api/daily-log`, {cache:"no-store"})</code>, falling back to the committed <code>content/log/*.json</code> if the API is unreachable.</div></div>
+      <p class="rb__upd"><b>To update:</b> you tick off a day's to-dos → I edit/create the matching <code>web/content/log/&lt;date&gt;.json</code> → run the importer → live on refresh.</p>
+    </div>
 
-    <div class="phase"><span class="phase__k">B</span><h3>LeetCode ✅ · then System Design</h3></div>
-    <div class="card">
-      <p><b>LeetCode is done</b> — same four moves (<code>LeetcodeProblem</code> table + <code>/api/leetcode</code> in 0x3f plan order + importer + dynamic <code>/leetcode</code>). The daily-log endpoint now also pulls each problem's solution URL from that table, so it's a single source. Send a new solution link → I update the backend → live on refresh.</p>
-      <p style="margin-top:8px"><b>System Design</b> is next — the richest (deck→slide nesting; slide text + the diagram <em>key</em> go in the DB, the diagram components stay in code). Detailed steps when we build it.</p>
+    <!-- ---- Runbook 2: LeetCode ---- -->
+    <div class="phase"><span class="phase__k">B</span><h3>LeetCode<span class="done">✅ live</span></h3></div>
+    <p class="phase__note">Powers <code>/leetcode</code>. Same four artifacts — the only new twist is preserving the 0x3f plan order.</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">① Table</span><div>Added <code>LeetcodeProblem</code> to <code>backend/models.py</code> → table <code>leetcode_problems</code>, columns: <code>id</code> (PK, the LC number) · <code>seq</code> · <code>slug</code> · <code>title</code> · <code>topics</code> (JSON) · <code>ep</code> · <code>difficulty</code> · <code>status</code> · <code>date</code> · <code>solution_url</code>. <b>Why <code>seq</code>:</b> it stores the row's position in the 0x3f study plan so the list keeps that exact order (not sorted by id).</div></div>
+      <div class="rb__row"><span class="rb__n">② Endpoint</span><div>Added <code>GET /api/leetcode</code> to <code>backend/main.py</code>. Returns <code>{track, trackUrl, updatedAt, problems}</code> with <code>problems</code> ordered by <code>seq</code> (the plan order). This same table is what the daily-log endpoint reads for solution links.</div></div>
+      <div class="rb__row"><span class="rb__n">③ Importer</span><div>Wrote <code>backend/import_leetcode.py</code> — reads <code>web/content/leetcode.json</code> and writes each problem, setting <code>seq</code> from the array index (so file order = display order). Run:<pre class="cmd">cd backend &amp;&amp; source .venv/bin/activate &amp;&amp; python import_leetcode.py</pre></div></div>
+      <div class="rb__row"><span class="rb__n">④ Page</span><div>Set <code>web/app/leetcode/page.tsx</code> to <code>force-dynamic</code> and made it fetch <code>${API_URL}/api/leetcode</code> (fallback: committed <code>leetcode.json</code>), then hand <code>problems</code> to the existing client-side table (filter/sort stay in the browser).</div></div>
+      <p class="rb__upd"><b>To update:</b> you send a solved-problem or solution link → I edit <code>web/content/leetcode.json</code> (add the row / set <code>solutionUrl</code>) → run the importer → both <code>/leetcode</code> and the daily log's ✓ chip update on refresh.</p>
+    </div>
+
+    <!-- ---- Runbook 3: System Design ---- -->
+    <div class="phase"><span class="phase__k">C</span><h3>System Design<span class="done">✅ live</span></h3></div>
+    <p class="phase__note">Powers <code>/system-design</code> + each <code>/system-design/&lt;slug&gt;</code> detail page. The richest one — decks contain nested slides, and slides reference a diagram.</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">⓪ Extract</span><div>The deck content used to live as a TypeScript array inside <code>web/app/system-design/decks.ts</code>. First I moved that content out to <b><code>web/content/system-design.json</code></b> (so an importer can read it), and rewired <code>decks.ts</code> to <code>import</code> that JSON — <code>decks.ts</code> now holds only the <b>types</b>, the static 30-deck <code>PHASES</code> curriculum, and small helpers.</div></div>
+      <div class="rb__row"><span class="rb__n">① Table</span><div>Added <code>SDDeck</code> to <code>backend/models.py</code> → table <code>sd_decks</code>, columns: <code>slug</code> (PK) · <code>n</code> (position in the 30-deck curriculum) · <code>title</code> · <code>last_reviewed</code> · <code>slides</code> (JSON — the full ordered slide array). <b>Key call:</b> a slide stores the diagram's <em>key</em> (e.g. <code>"loadBalanced"</code>) as text; the actual diagram <b>components stay in code</b> at <code>web/app/system-design/diagrams.tsx</code>. Only decks that have content live here — the 30-deck route stays static in <code>decks.ts</code>.</div></div>
+      <div class="rb__row"><span class="rb__n">② Endpoint</span><div>Added <code>GET /api/system-design</code> to <code>backend/main.py</code>. Returns <code>{decks: [...]}</code> ordered by <code>n</code>, each deck carrying its full <code>slides</code> array.</div></div>
+      <div class="rb__row"><span class="rb__n">③ Importer</span><div>Wrote <code>backend/import_system_design.py</code> — reads <code>web/content/system-design.json</code> and writes one row per deck. Run:<pre class="cmd">cd backend &amp;&amp; source .venv/bin/activate &amp;&amp; python import_system_design.py</pre></div></div>
+      <div class="rb__row"><span class="rb__n">④ Pages</span><div>Added a shared fetch helper <code>web/app/system-design/data.ts</code> (<code>getDecks()</code> → fetch the endpoint, fallback to the imported JSON). Set <b>both</b> pages to <code>force-dynamic</code>: <code>system-design/page.tsx</code> (the tree — builds "done" ticks &amp; dates from the fetched decks, keeps <code>PHASES</code> static) and <code>system-design/[slug]/page.tsx</code> (a deck — fetches, finds the slug, maps each slide's diagram key to its component; dropped <code>generateStaticParams</code> since routes are now dynamic).</div></div>
+      <p class="rb__upd"><b>To update:</b> you send screenshots/notes for a new deck → I add it to <code>web/content/system-design.json</code> (and, only if it needs a brand-new diagram, add that component to <code>diagrams.tsx</code>) → run the importer → the tree marks it done and its detail page goes live on refresh.</p>
     </div>
   </section>
 
@@ -738,7 +742,8 @@ Instance Type   = Free</pre>
         <tr><td class="v">v0.2.0</td><td>P1 · S2 core — section routes + LeetCode table (filter/sort/status/colored topics) + curated Daily Log</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.2.x</td><td>P1 · S2 wrap-up — anonymized Applications dashboard + calendar · System Design tree + per-deck detail pages · "Today I Learned" home + footer</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.3.0</td><td>P2 · S1 — FastAPI (Render) + Postgres (Neon); Applications served live via the aggregate API (dynamic, no rebuild)</td><td>✅ Done</td></tr>
-        <tr><td class="v">v0.3.x</td><td>Phase 2 rest — login + private views · admin editor · daily scheduled sync</td><td>🗺️ Planned</td></tr>
+        <tr><td class="v">v0.4.0</td><td>P2 · S2 — instant sync for all content: Daily Log · LeetCode · System Design each moved to the backend (table + endpoint + importer + dynamic page)</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.4.x+</td><td>Phase 2 rest — S3 login + private views · S4 admin editor · S5 retire local sources / scheduled sync</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
   </div>
