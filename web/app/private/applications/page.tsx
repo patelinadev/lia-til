@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { getFullApplications } from "@/lib/private";
+import ApplicationsExplorer from "./ApplicationsExplorer";
 
 export const metadata = {
   title: "Private · Applications",
@@ -8,12 +9,6 @@ export const metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-const STATUS_STYLES: Record<string, string> = {
-  Interviewing: "text-emerald-700 dark:text-emerald-400",
-  "Heard back": "text-blue-700 dark:text-blue-400",
-  Closed: "text-neutral-400 dark:text-neutral-500",
-};
 
 export default async function PrivateApplicationsPage() {
   await requireAdmin();
@@ -46,34 +41,7 @@ export default async function PrivateApplicationsPage() {
           that the ledger has been imported.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
-          <table className="w-full border-collapse text-left text-sm">
-            <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500 dark:bg-neutral-900/50">
-              <tr>
-                <th className="px-3 py-2 font-medium">#</th>
-                <th className="px-3 py-2 font-medium">Company</th>
-                <th className="px-3 py-2 font-medium">Role</th>
-                <th className="px-3 py-2 font-medium">Résumé</th>
-                <th className="px-3 py-2 font-medium">Applied</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {apps.map((a) => (
-                <tr key={a.appNum} className="border-t border-neutral-100 dark:border-neutral-800/60">
-                  <td className="px-3 py-2 font-mono text-xs text-neutral-400">{a.appNum}</td>
-                  <td className="px-3 py-2 font-medium">{a.company}</td>
-                  <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">{a.role}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-neutral-500">{a.resume}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-neutral-500">{a.appliedDate}</td>
-                  <td className={`px-3 py-2 ${STATUS_STYLES[a.status ?? ""] ?? "text-neutral-500"}`}>{a.status}</td>
-                  <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">{a.notes}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ApplicationsExplorer apps={apps} />
       )}
     </main>
   );

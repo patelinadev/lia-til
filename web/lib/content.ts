@@ -137,6 +137,28 @@ function hashString(s: string): number {
   return h;
 }
 
+/** Is `needle` a subsequence of `hay`? (both already lower-cased) */
+function isSubsequence(needle: string, hay: string): boolean {
+  let i = 0;
+  for (let j = 0; j < hay.length && i < needle.length; j++) {
+    if (hay[j] === needle[i]) i++;
+  }
+  return i === needle.length;
+}
+
+/**
+ * Loose, token-based match. The query is lower-cased and split on whitespace;
+ * every token must appear in the haystack as a substring OR a subsequence. So
+ * "backend engineer" matches "Software Engineer, Backend", "ai" matches "AI/ML",
+ * and a typo like "bkend" still matches "backend". Empty query matches everything.
+ */
+export function fuzzyMatch(query: string, haystack: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const hay = haystack.toLowerCase();
+  return q.split(/\s+/).every((tok) => hay.includes(tok) || isSubsequence(tok, hay));
+}
+
 /** A stable, well-separated hue (0–359) for a topic tag's color. */
 export function topicHue(topic: string): number {
   const key = topic.trim().toLowerCase();
