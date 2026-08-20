@@ -35,6 +35,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           >
             Lia
           </a>
+          <a href="/private" aria-label="Private area" className="ml-2 hover:underline">
+            &middot;
+          </a>
         </footer>
       </body>
     </html>

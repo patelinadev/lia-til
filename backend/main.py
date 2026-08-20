@@ -5,9 +5,11 @@ service exposes ONLY aggregate counts (no company names, roles, salaries).
 Private full views come later behind auth (S2).
 """
 
+import os
 from contextlib import asynccontextmanager
+from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException
 from sqlalchemy import func, select
 
 from db import Base, SessionLocal, engine
@@ -15,6 +17,17 @@ from models import Application, DailyLog, LeetcodeProblem, SDDeck
 
 LEETCODE_TRACK = "0x3f Basic Algorithms"
 LEETCODE_TRACK_URL = "https://space.bilibili.com/206214/channel/collectiondetail?sid=842776"
+
+# Shared secret for the private endpoints. The site's server (never the browser)
+# sends it after it has verified the admin's session. Set BACKEND_SECRET on Render.
+ADMIN_SECRET = os.environ.get("BACKEND_SECRET")
+
+
+def require_admin(x_admin_secret: Optional[str] = Header(default=None)) -> None:
+    """Gate a private endpoint: reject unless the shared secret matches. If the
+    secret isn't configured at all, the private endpoints stay closed."""
+    if not ADMIN_SECRET or x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=401, detail="unauthorized")
 
 
 @asynccontextmanager
@@ -65,6 +78,33 @@ def applications_summary():
         "byStatus": by_status,
         "byDate": by_date,
     }
+
+
+@app.get("/api/applications/full", dependencies=[Depends(require_admin)])
+def applications_full():
+    """PRIVATE — full per-company ledger rows. Only reachable with the shared
+    secret; the public site gates this behind the admin's GitHub session."""
+    if SessionLocal is None:
+        return {"applications": []}
+    with SessionLocal() as session:
+        rows = (
+            session.execute(select(Application).order_by(Application.app_num))
+            .scalars()
+            .all()
+        )
+        apps = [
+            {
+                "appNum": r.app_num,
+                "company": r.company,
+                "role": r.role,
+                "resume": r.resume,
+                "appliedDate": r.applied_date.isoformat() if r.applied_date else None,
+                "status": r.status,
+                "notes": r.notes,
+            }
+            for r in rows
+        ]
+    return {"total": len(apps), "applications": apps}
 
 
 @app.get("/api/leetcode")
