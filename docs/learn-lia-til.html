@@ -1,0 +1,796 @@
+<title>Inside lia-til</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+  /* ---------- tokens: light is the base :root ---------- */
+  :root {
+    --paper:      #F5F7F6;
+    --surface:    #FFFFFF;
+    --surface-2:  #EEF1F0;
+    --ink:        #16211E;
+    --ink-soft:   #53625C;
+    --ink-faint:  #8B968F;
+    --line:       #E1E6E3;
+    --line-strong:#CDD5D1;
+    --accent:     #0C7C6B;   /* teal — structure, links, active */
+    --accent-bg:  #E2F1ED;
+    --pick:       #A5620C;   /* amber — "the choice / why" (selection) */
+    --pick-bg:    #F6ECDA;
+    --pick-line:  #E7CE9F;
+    --cost:       #AE3F3A;   /* rose — "what it traded away" */
+    --cost-bg:    #F7E7E5;
+    --cost-line:  #EBC3BF;
+    --ok:         #1C7A54;
+    --ok-bg:      #E1F1E9;
+    --bad:        #AE3F3A;
+    --bad-bg:     #F7E7E5;
+    --code-bg:    #F2F4F3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0E1512;
+      --surface:    #141C19;
+      --surface-2:  #1B2420;
+      --ink:        #E7EEEB;
+      --ink-soft:   #A3AFA9;
+      --ink-faint:  #6B766F;
+      --line:       #243029;
+      --line-strong:#334037;
+      --accent:     #4FC8B0;
+      --accent-bg:  #123029;
+      --pick:       #E0A458;
+      --pick-bg:    #2E2416;
+      --pick-line:  #52401F;
+      --cost:       #E58079;
+      --cost-bg:    #331D1B;
+      --cost-line:  #593230;
+      --ok:         #64C79A;
+      --ok-bg:      #14301F;
+      --bad:        #E58079;
+      --bad-bg:     #331D1B;
+      --code-bg:    #101815;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #0E1512;
+    --surface:    #141C19;
+    --surface-2:  #1B2420;
+    --ink:        #E7EEEB;
+    --ink-soft:   #A3AFA9;
+    --ink-faint:  #6B766F;
+    --line:       #243029;
+    --line-strong:#334037;
+    --accent:     #4FC8B0;
+    --accent-bg:  #123029;
+    --pick:       #E0A458;
+    --pick-bg:    #2E2416;
+    --pick-line:  #52401F;
+    --cost:       #E58079;
+    --cost-bg:    #331D1B;
+    --cost-line:  #593230;
+    --ok:         #64C79A;
+    --ok-bg:      #14301F;
+    --bad:        #E58079;
+    --bad-bg:     #331D1B;
+    --code-bg:    #101815;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- shell: sticky rail + reading column ---------- */
+  .shell { display: grid; grid-template-columns: 288px minmax(0, 1fr); gap: 0; max-width: 1180px; margin: 0 auto; }
+  .rail { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; padding: 28px 22px 40px; border-right: 1px solid var(--line); }
+  .main { min-width: 0; padding: 40px clamp(20px, 5vw, 68px) 120px; }
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; }
+    .rail { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  }
+
+  /* ---------- rail ---------- */
+  .brand { font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
+  .brand b { color: var(--accent); font-weight: 600; }
+  .rail h1 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 26px; line-height: 1.1; margin: 8px 0 16px; text-wrap: balance; }
+  .prog { margin-bottom: 6px; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .prog__fill { height: 100%; width: 0; background: var(--accent); transition: width .35s ease; }
+  .prog__label { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-faint); margin-bottom: 18px; }
+  .toc { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  .toc a { display: flex; align-items: baseline; gap: 9px; padding: 6px 9px; border-radius: 8px; text-decoration: none; color: var(--ink-soft); font-size: 13.5px; line-height: 1.35; transition: background .15s, color .15s; }
+  .toc a:hover { background: var(--surface-2); color: var(--ink); }
+  .toc a.active { background: var(--accent-bg); color: var(--ink); font-weight: 600; }
+  .toc .n { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-faint); min-width: 16px; }
+  .toc a.active .n { color: var(--accent); }
+  .toc .tick { margin-left: auto; color: var(--ok); font-weight: 700; opacity: 0; transition: opacity .2s; }
+  .toc a.done .tick { opacity: 1; }
+  .toc a.done .n { color: var(--ok); }
+  .part { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding: 14px 9px 5px; }
+
+  /* ---------- reading column ---------- */
+  .lede { max-width: 68ch; }
+  .lede .kicker { font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  .lede h2.title { font-family: "Fraunces", Georgia, serif; font-weight: 700; font-size: clamp(30px, 5vw, 44px); line-height: 1.05; margin: 10px 0 14px; text-wrap: balance; }
+  .lede p { color: var(--ink-soft); font-size: 17px; }
+
+  section.sec { max-width: 70ch; padding-top: 30px; margin-top: 40px; border-top: 1px solid var(--line); scroll-margin-top: 20px; }
+  .sec > .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+  .sec > h2 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: clamp(23px, 3.4vw, 31px); line-height: 1.12; margin: 6px 0 4px; text-wrap: balance; }
+  .sec h3 { font-family: "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 18px; margin: 26px 0 6px; }
+  .sec p { color: var(--ink-soft); }
+  .sec strong, .sec b { color: var(--ink); font-weight: 600; }
+  .sec a { color: var(--accent); }
+
+  /* the "pain first" opener */
+  .pain { display: flex; gap: 12px; padding: 14px 16px; margin: 16px 0; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--pick); border-radius: 10px; }
+  .pain .lab { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--pick); flex: none; padding-top: 3px; font-weight: 600; }
+  .pain p { margin: 0; color: var(--ink); }
+
+  code { font-family: "IBM Plex Mono", monospace; font-size: .86em; background: var(--code-bg); border: 1px solid var(--line); padding: 1px 5px; border-radius: 5px; color: var(--ink); }
+  pre { margin: 14px 0; padding: 15px 16px; background: var(--code-bg); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+  pre code { background: none; border: 0; padding: 0; font-size: 13px; line-height: 1.6; color: var(--ink); }
+  pre .c { color: var(--ink-faint); }
+  pre .k { color: var(--accent); font-weight: 600; }
+  pre .s { color: var(--pick); }
+  .fn { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-faint); display: block; margin: 12px 0 -6px; }
+
+  /* decision cards (the 决策台账) */
+  .decision { margin: 16px 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .decision__h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 12px 16px; background: var(--surface-2); }
+  .decision__h b { font-size: 15.5px; }
+  .decision__h .pill { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; padding: 2px 8px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--ink-soft); }
+  .decision__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
+  @media (max-width: 560px) { .decision__grid { grid-template-columns: 1fr; } }
+  .decision__cell { background: var(--surface); padding: 12px 16px; }
+  .decision__cell .lab { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; display: block; margin-bottom: 3px; }
+  .decision__cell.pick .lab { color: var(--pick); }
+  .decision__cell.cost .lab { color: var(--cost); }
+  .decision__cell p { margin: 0; font-size: 14px; color: var(--ink); }
+
+  /* diagrams (hand-built, theme-aware) */
+  .diagram { margin: 20px 0; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow-x: auto; }
+  .layers { display: flex; flex-direction: column; gap: 0; min-width: 320px; }
+  .layer { position: relative; display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); }
+  .layer + .layer { margin-top: 26px; }
+  .layer + .layer::before { content: "↓"; position: absolute; top: -23px; left: 26px; color: var(--ink-faint); font-size: 15px; }
+  .layer .num { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-bg); width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; flex: none; }
+  .layer .lname { font-weight: 600; font-size: 14.5px; }
+  .layer .lwhat { font-size: 12.5px; color: var(--ink-soft); }
+  .layer .file { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-faint); margin-left: auto; text-align: right; flex: none; }
+  .layer.pub { border-color: var(--accent); }
+  .layer.priv { border-color: var(--pick-line); background: var(--pick-bg); }
+
+  /* sequence flow (auth) */
+  .flow { display: flex; flex-direction: column; gap: 12px; counter-reset: step; min-width: 320px; }
+  .fstep { display: grid; grid-template-columns: 30px 1fr; gap: 12px; }
+  .fstep .sd { font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 12px; color: var(--surface); background: var(--accent); width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center; }
+  .fstep.ext .sd { background: var(--pick); }
+  .fstep .fb { border: 1px solid var(--line); border-radius: 10px; padding: 9px 13px; background: var(--surface); }
+  .fstep .who { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); }
+  .fstep.ext .who { color: var(--pick); }
+  .fstep .txt { font-size: 13.5px; color: var(--ink); }
+  .fstep .txt code { font-size: 12px; }
+
+  /* callouts */
+  .callout { display: flex; gap: 12px; margin: 18px 0; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--accent); background: var(--accent-bg); }
+  .callout.aha { border-color: var(--pick-line); background: var(--pick-bg); }
+  .callout .ci { font-size: 18px; flex: none; line-height: 1.3; }
+  .callout p { margin: 0; color: var(--ink); font-size: 14.5px; }
+  .callout b { color: var(--ink); }
+
+  /* self-check */
+  .check { margin: 24px 0 4px; border: 1.5px solid var(--line-strong); border-radius: 14px; overflow: hidden; }
+  .check__top { padding: 8px 16px; background: var(--surface-2); font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); display: flex; justify-content: space-between; }
+  .check__top .cap { color: var(--pick); }
+  .check__body { padding: 16px; }
+  .check__q { margin: 0 0 12px; font-weight: 600; color: var(--ink); font-size: 15px; }
+  .opts { display: flex; flex-direction: column; gap: 8px; }
+  .opt { text-align: left; width: 100%; padding: 11px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; transition: border-color .15s, background .15s; }
+  .opt:hover:not(:disabled) { border-color: var(--accent); }
+  .opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .opt.correct { border-color: var(--ok); background: var(--ok-bg); }
+  .opt.wrong { border-color: var(--bad); background: var(--bad-bg); }
+  .opt .badge { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600; margin-right: 8px; color: var(--ink-faint); }
+  .fb { margin-top: 14px; padding: 13px 15px; border-radius: 10px; font-size: 13.5px; line-height: 1.6; display: none; }
+  .fb.show { display: block; }
+  .fb.pass { background: var(--ok-bg); border: 1px solid var(--ok); }
+  .fb.fail { background: var(--bad-bg); border: 1px solid var(--bad); }
+  .fb .grade { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .fb b { color: var(--ink); }
+
+  .say { margin: 16px 0; padding: 14px 16px; border: 1px dashed var(--line-strong); border-radius: 12px; background: var(--surface); }
+  .say .lab { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+  .say ol { margin: 8px 0 0; padding-left: 20px; }
+  .say li { color: var(--ink); font-size: 14px; margin: 5px 0; }
+  .say li i { color: var(--ink-soft); font-style: italic; }
+
+  .done-banner { margin-top: 40px; padding: 22px; border-radius: 16px; border: 1px solid var(--accent); background: var(--accent-bg); }
+  .done-banner h2 { font-family: "Fraunces", serif; margin: 0 0 6px; }
+  .reset { margin-top: 26px; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-faint); background: none; border: 0; cursor: pointer; text-decoration: underline; }
+  hr.soft { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="brand">A guided read · <b>lia-til</b></div>
+    <h1>Inside lia-til</h1>
+    <div class="prog"><div class="prog__fill" id="pf"></div></div>
+    <div class="prog__label"><span id="pc">0</span> / <span id="ptot">12</span> checks passed</div>
+    <nav>
+      <ul class="toc" id="toc">
+        <li class="part">Orient</li>
+        <li><a href="#s0"><span class="n">00</span><span>How to read a codebase</span><span class="tick">✓</span></a></li>
+        <li class="part">Part 1 · The stack, as choices</li>
+        <li><a href="#s1"><span class="n">01</span><span>Why Next.js + Vercel</span><span class="tick">✓</span></a></li>
+        <li><a href="#s2"><span class="n">02</span><span>Why a backend (FastAPI + Neon + Render)</span><span class="tick">✓</span></a></li>
+        <li><a href="#s3"><span class="n">03</span><span>The instant-sync trick</span><span class="tick">✓</span></a></li>
+        <li><a href="#s4"><span class="n">04</span><span>Why custom OAuth, not a library</span><span class="tick">✓</span></a></li>
+        <li class="part">Part 2 · API design (the layers)</li>
+        <li><a href="#s5"><span class="n">05</span><span>The six-layer pipeline</span><span class="tick">✓</span></a></li>
+        <li><a href="#s6"><span class="n">06</span><span>Public vs private endpoints</span><span class="tick">✓</span></a></li>
+        <li class="part">Part 3 · Authentication (the wiring)</li>
+        <li><a href="#s7"><span class="n">07</span><span>Why a third party (that SMS!)</span><span class="tick">✓</span></a></li>
+        <li><a href="#s8"><span class="n">08</span><span>The OAuth dance, step by step</span><span class="tick">✓</span></a></li>
+        <li><a href="#s9"><span class="n">09</span><span>Sessions &amp; secrets: who holds what</span><span class="tick">✓</span></a></li>
+        <li class="part">Part 4 · Mastery</li>
+        <li><a href="#s10"><span class="n">10</span><span>Reading the code &amp; how it was built</span><span class="tick">✓</span></a></li>
+        <li><a href="#s11"><span class="n">11</span><span>Draw it blindfolded</span><span class="tick">✓</span></a></li>
+      </ul>
+    </nav>
+    <button class="reset" id="reset">reset my progress</button>
+  </aside>
+
+  <main class="main">
+    <div class="lede">
+      <p class="kicker">From first deploy → private login</p>
+      <h2 class="title">Read your own codebase like an engineer</h2>
+      <p>You built this — with a lot of help. This guide makes it <b>yours</b>: not "what is each file" but <b>why each choice beat the alternative, and when you'd switch</b>. That's the exact thing an interviewer scores. Read it beside your editor; after each part, answer one check to see if it landed. The bar: you can <b>draw the two big diagrams from memory</b>.</p>
+    </div>
+
+    <!-- ============ 00 ============ -->
+    <section class="sec" id="s0">
+      <p class="eyebrow">Orient</p>
+      <h2>00 · How to read a codebase</h2>
+      <p>Nobody reads code top-to-bottom like a book. You <b>follow one thing through the system</b>. The most useful thread here is a single piece of data — say, "the number 129 on the Applications page" — and you trace it from where it's stored to where it's shown.</p>
+
+      <p>The repo is two apps plus docs:</p>
+      <pre><code>lia-til/
+├─ web/            <span class="c"># the FRONTEND — Next.js, deploys to Vercel</span>
+│  ├─ app/         <span class="c"># every folder = a URL (App Router)</span>
+│  ├─ lib/         <span class="c"># server-only helpers (auth, data fetch)</span>
+│  └─ content/     <span class="c"># committed JSON snapshots (the fallback)</span>
+├─ backend/        <span class="c"># the BACKEND — FastAPI, deploys to Render</span>
+│  ├─ main.py      <span class="c"># the API endpoints</span>
+│  ├─ models.py    <span class="c"># the database tables (as Python classes)</span>
+│  ├─ db.py        <span class="c"># the Postgres connection</span>
+│  └─ import_*.py  <span class="c"># scripts that load data into the DB</span>
+└─ docs/           <span class="c"># the walkthrough + this guide</span></code></pre>
+
+      <p>Two mental hooks to hold the whole time:</p>
+      <p><b>1. Frontend vs backend = two separate deployments.</b> <code>web/</code> lives on Vercel (URL ends <code>.vercel.app</code>); <code>backend/</code> lives on Render (URL ends <code>.onrender.com</code>). They talk over HTTP. This is why the same secret has to be set in <em>two</em> places — you hit exactly this when the login broke.</p>
+      <p><b>2. Follow the data.</b> Every feature is the same journey: something is <em>stored</em>, an <em>endpoint</em> serves it, a <em>page</em> fetches and renders it. Learn that spine once (Part 2) and every page is the same shape.</p>
+
+      <div class="check" data-sec="s0">
+        <div class="check__top"><span>Check 00</span><span>warm-up</span></div>
+        <div class="check__body">
+          <p class="check__q">The Applications page shows a JSON error when you open <code>lia-til.onrender.com/applications</code>. Why?</p>
+          <div class="opts">
+            <button class="opt" data-ok="0">The backend crashed and needs a redeploy.</button>
+            <button class="opt" data-ok="1"><code>/applications</code> is a <b>page</b>, and pages live on Vercel — <code>onrender.com</code> is the backend, which only serves <code>/api/...</code> data.</button>
+            <button class="opt" data-ok="0">The database is empty, so the page can't render.</button>
+          </div>
+          <div class="fb" data-fb="0"><span class="grade">Not quite.</span> This is a <b>layer confusion</b> — the most important error to avoid. Pages are on Vercel; the backend serves only JSON at <code>/api/...</code>. Opening a page URL on the backend host will always 404. (You actually hit this once.)</div>
+          <div class="fb" data-fb="1"><span class="grade">Yes.</span> Frontend (pages) and backend (data) are two different deployments on two different hosts. Holding that line straight is half of understanding this project.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 01 ============ -->
+    <section class="sec" id="s1">
+      <p class="eyebrow">Part 1 · The stack, as choices</p>
+      <h2>01 · Why Next.js + Vercel</h2>
+      <div class="pain"><span class="lab">Pain</span><p>You wanted a public site that you could <b>keep changing</b> without emailing files to a server every time — and it had to be free and look decent.</p></div>
+
+      <p>A plain HTML file would work, but the moment you want many pages, shared layout, and "push to update," you're hand-rolling a framework. <b>Next.js</b> gives you file-based routing (a folder = a URL), server rendering, and a first-class host (<b>Vercel</b>) that redeploys on every <code>git push</code>. That auto-deploy pipeline is the reason the very first stage existed: prove "edit → push → live" before building anything real.</p>
+
+      <div class="decision">
+        <div class="decision__h"><b>Next.js + Vercel</b> <span class="pill">frontend</span></div>
+        <div class="decision__grid">
+          <div class="decision__cell pick"><span class="lab">Why it won</span><p>Folder-based routing, SSR + static, and <code>git push</code> → live in ~30s. React means components you already half-know.</p></div>
+          <div class="decision__cell cost"><span class="lab">What it traded away</span><p>A build step and framework weight vs a raw HTML file. You now must know its rules (Server vs Client components, dynamic rendering).</p></div>
+          <div class="decision__cell"><span class="lab">Named rival</span><p><b>Plain HTML/CSS</b> (too manual past a few pages) · <b>Create-React-App / Vite SPA</b> (no server rendering, no built-in routing/host).</p></div>
+          <div class="decision__cell"><span class="lab">When you'd switch</span><p>A truly static one-pager with no shared layout → plain HTML. A heavy client app with no SEO need → a Vite SPA.</p></div>
+        </div>
+      </div>
+
+      <div class="check" data-sec="s1">
+        <div class="check__top"><span>Check 01</span><span class="cap">selection · /5</span></div>
+        <div class="check__body">
+          <p class="check__q">"Why did you use Next.js?" — which answer scores a 5 in an interview?</p>
+          <div class="opts">
+            <button class="opt" data-ok="0">"Next.js is a popular React framework for building web apps."</button>
+            <button class="opt" data-ok="0">"It has routing and server-side rendering built in."</button>
+            <button class="opt" data-ok="1">"I needed shared layout + push-to-deploy; plain HTML gets unmanageable and a Vite SPA has no server rendering or host story. If it were one static page, I'd drop the framework."</button>
+          </div>
+          <div class="fb" data-fb="0"><span class="grade">1–2/5.</span> That's a <b>definition</b> ("X is a…"). Definitions are free to look up, so they score near zero. The interviewer wants the <em>choice</em>.</div>
+          <div class="fb" data-fb="1"><span class="grade">5/5.</span> Names the constraint (shared layout + deploy), the <b>rival</b> (HTML / Vite SPA), the cost, <b>and</b> the switch condition. That last clause is what turns a 4 into a 5.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 02 ============ -->
+    <section class="sec" id="s2">
+      <p class="eyebrow">Part 1 · The stack, as choices</p>
+      <h2>02 · Why a backend at all — FastAPI + Neon + Render</h2>
+      <div class="pain"><span class="lab">Pain</span><p>With everything baked into the site, <b>every content change meant a code change + a rebuild</b>. You wanted one place that holds the truth, and updates that show up instantly. You also wanted the résumé to say "I built a backend."</p></div>
+
+      <p>So Phase 2 added a real backend: a <b>database</b> as the single source of truth, and an <b>API</b> in front of it. Three picks, each with a reason:</p>
+
+      <div class="decision">
+        <div class="decision__h"><b>FastAPI</b> <span class="pill">the API</span></div>
+        <div class="decision__grid">
+          <div class="decision__cell pick"><span class="lab">Why it won</span><p>Python (you're learning backend in Python), tiny to stand up, auto-generates API docs, typed request/response.</p></div>
+          <div class="decision__cell cost"><span class="lab">Traded away</span><p>You run a server process (vs "just functions"). More to host and keep awake.</p></div>
+          <div class="decision__cell"><span class="lab">Named rival</span><p><b>Express/Node</b> (would've meant JS on both sides, but you want Python on the résumé) · <b>Django</b> (heavier, batteries you don't need).</p></div>
+          <div class="decision__cell"><span class="lab">Switch when</span><p>You need Django's admin/ORM ecosystem, or a Node-only shop.</p></div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision__h"><b>Neon Postgres</b> <span class="pill">the database</span></div>
+        <div class="decision__grid">
+          <div class="decision__cell pick"><span class="lab">Why it won</span><p>Real SQL Postgres, serverless + free, scales to zero when idle. "Postgres" is the résumé-legible skill.</p></div>
+          <div class="decision__cell cost"><span class="lab">Traded away</span><p>Cold start after idle (first query wakes it). A pooled vs direct connection gotcha to remember.</p></div>
+          <div class="decision__cell"><span class="lab">Named rival</span><p><b>SQLite</b> (a file — dies on a serverless host) · <b>MongoDB</b> (your data is tabular + relational; SQL fits) · <b>Firebase</b> (locks you into its SDK).</p></div>
+          <div class="decision__cell"><span class="lab">Switch when</span><p>Document-shaped data with no joins → a document DB.</p></div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision__h"><b>Render</b> <span class="pill">the host</span></div>
+        <div class="decision__grid">
+          <div class="decision__cell pick"><span class="lab">Why it won</span><p>Free web-service tier, auto-deploys from GitHub like Vercel does. Simple.</p></div>
+          <div class="decision__cell cost"><span class="lab">Traded away</span><p>Free tier <b>sleeps after 15 min idle</b> → ~30–60s cold start on the first hit.</p></div>
+          <div class="decision__cell"><span class="lab">Named rival</span><p><b>Railway</b> (free tier gone) · <b>a Vercel serverless function</b> (would fold API into the frontend — but "I ran a separate FastAPI service" is the better story, and Python functions on Vercel are fiddlier).</p></div>
+          <div class="decision__cell"><span class="lab">Switch when</span><p>You need no-cold-start / real traffic → a paid tier or a container on a cloud VM (that's Phase 3).</p></div>
+        </div>
+      </div>
+
+      <div class="check" data-sec="s2">
+        <div class="check__top"><span>Check 02</span><span class="cap">selection · /5</span></div>
+        <div class="check__body">
+          <p class="check__q">Interviewer: "Why Postgres and not MongoDB for this?" Best answer?</p>
+          <div class="opts">
+            <button class="opt" data-ok="0">"Postgres is more reliable and widely used."</button>
+            <button class="opt" data-ok="1">"My data is tabular and relational — applications, problems, log days with shared fields — so SQL fits and I get joins for free. Mongo shines for document-shaped data with no joins; if the schema went nested and schema-less, I'd reconsider."</button>
+            <button class="opt" data-ok="0">"I already knew SQL, so it was faster."</button>
+          </div>
+          <div class="fb" data-fb="0"><span class="grade">≤3/5.</span> "More reliable / I knew it" isn't a selection reason — it doesn't name what Mongo is <em>good</em> at or when you'd flip. Capped at 3 with no real trade-off.</div>
+          <div class="fb" data-fb="1"><span class="grade">5/5.</span> Names the constraint (relational data), the rival's strength (documents), and the switch condition. That shape — constraint → rival → flip — is the whole game.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 03 ============ -->
+    <section class="sec" id="s3">
+      <p class="eyebrow">Part 1 · The stack, as choices</p>
+      <h2>03 · The instant-sync trick</h2>
+      <div class="pain"><span class="lab">Pain</span><p>Even with a backend, if pages were <b>pre-built</b>, a data change still wouldn't show until a rebuild. You wanted: change the data → refresh → it's there.</p></div>
+
+      <p>Next.js normally pre-renders pages at build time (fast, but frozen). The fix is one line per page: <code>export const dynamic = "force-dynamic"</code>. That tells Next "render this <b>on every request</b>," so the page re-fetches the API each time you open it. No rebuild, no <code>git push</code> — the DB is the source, the page just reads it live.</p>
+
+      <pre><code><span class="c">// web/app/applications/page.tsx</span>
+<span class="k">export const</span> dynamic = <span class="s">"force-dynamic"</span>;   <span class="c">// render per request, not at build</span>
+
+<span class="k">async function</span> getSummary() {
+  <span class="k">const</span> base = process.env.API_URL;
+  <span class="k">try</span> {
+    <span class="k">const</span> res = <span class="k">await</span> fetch(`${base}/api/applications/summary`, { cache: <span class="s">"no-store"</span> });
+    <span class="k">if</span> (res.ok) <span class="k">return</span> res.json();     <span class="c">// live from the backend</span>
+  } <span class="k">catch</span> {}
+  <span class="k">return</span> committedSnapshot;             <span class="c">// fallback if the API is down/asleep</span>
+}</code></pre>
+
+      <div class="callout"><span class="ci">🔁</span><p>The <code>content/*.json</code> files in the repo are the <b>fallback</b>, not the source. If Render is asleep or unset, the page still renders yesterday's committed snapshot instead of breaking. Live data preferred, static safety net underneath.</p></div>
+
+      <div class="check" data-sec="s3">
+        <div class="check__top"><span>Check 03</span><span class="cap">selection · /5</span></div>
+        <div class="check__body">
+          <p class="check__q">What did <code>force-dynamic</code> buy, and what did it cost?</p>
+          <div class="opts">
+            <button class="opt" data-ok="1">Bought: data updates without a rebuild (renders per request). Cost: every visit does a live fetch, so it's slower and leans on the backend being awake — hence the committed fallback.</button>
+            <button class="opt" data-ok="0">Bought: faster page loads because pages are cached. Cost: nothing.</button>
+            <button class="opt" data-ok="0">It makes the page a Client Component so it can use React state.</button>
+          </div>
+          <div class="fb" data-fb="1"><span class="grade">5/5.</span> Every technique buys something by selling something. Here: freshness bought at the price of a per-request fetch + a dependency on the backend — which is exactly why the fallback exists.</div>
+          <div class="fb" data-fb="0"><span class="grade">Wrong model.</span> <code>force-dynamic</code> is the <em>opposite</em> of caching — it re-renders every request. And it's about server rendering timing, not Client Components. Reset the model: dynamic = fresh-but-slower; static = fast-but-frozen.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 04 ============ -->
+    <section class="sec" id="s4">
+      <p class="eyebrow">Part 1 · The stack, as choices</p>
+      <h2>04 · Why custom OAuth, not a library</h2>
+      <div class="pain"><span class="lab">Pain</span><p>You needed a login so <b>only you</b> can see the private ledger. The obvious move is a library (Auth.js/NextAuth). But this Next.js is version 16 — brand new — and it renamed <code>middleware</code> to <code>Proxy</code>, which Auth.js v5 leans on. Risky.</p></div>
+
+      <p>So instead of a library we hand-wrote the standard <b>OAuth2 authorization-code flow</b> + a signed session cookie — which is exactly the pattern Next's own docs endorse. For a single user, it's ~120 lines you fully control, and "I implemented OAuth" is a far better interview story than "I installed a library."</p>
+
+      <div class="decision">
+        <div class="decision__h"><b>Custom OAuth + jose session</b> <span class="pill">auth</span></div>
+        <div class="decision__grid">
+          <div class="decision__cell pick"><span class="lab">Why it won</span><p>No dependency fighting a v16 breaking change; total control; you understand every line; great résumé/interview material.</p></div>
+          <div class="decision__cell cost"><span class="lab">Traded away</span><p>You own the security details (CSRF state, cookie flags) yourself — a library would handle those. Fine for one user; not for many with password reset, roles, etc.</p></div>
+          <div class="decision__cell"><span class="lab">Named rival</span><p><b>Auth.js / NextAuth</b> (leans on the renamed middleware) · <b>Clerk/Auth0</b> (hosted, but overkill + another vendor for a one-person gate).</p></div>
+          <div class="decision__cell"><span class="lab">Switch when</span><p>Multiple users, social + email logins, roles, or you don't want to own security → a library or hosted provider.</p></div>
+        </div>
+      </div>
+
+      <div class="check" data-sec="s4">
+        <div class="check__top"><span>Check 04</span><span class="cap">selection · /5</span></div>
+        <div class="check__body">
+          <p class="check__q">"Why not just use NextAuth?" Which is the interview-grade answer?</p>
+          <div class="opts">
+            <button class="opt" data-ok="0">"Writing it myself is more secure than a library."</button>
+            <button class="opt" data-ok="1">"Next 16 renamed middleware→Proxy, which Auth.js v5 depends on, so it was risky on this version. For one user the flow is ~120 lines I control. If I add multiple users or roles, I'd move to a library — it handles the parts I'd rather not own."</button>
+            <button class="opt" data-ok="0">"NextAuth is bloated and I don't like dependencies."</button>
+          </div>
+          <div class="fb" data-fb="0"><span class="grade">≤2/5.</span> "More secure by hand" is a <b>wrong model</b> — rolling your own auth is usually <em>less</em> safe; the honest reason is version compatibility + scope, not superiority. "I don't like dependencies" is taste, not selection.</div>
+          <div class="fb" data-fb="1"><span class="grade">5/5.</span> Concrete constraint (the v16 rename), honest scope (one user), and a clean switch condition (more users → library). Note it does <em>not</em> claim hand-rolled is safer.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 05 ============ -->
+    <section class="sec" id="s5">
+      <p class="eyebrow">Part 2 · API design — the layers</p>
+      <h2>05 · The six-layer pipeline</h2>
+      <p>This is the part you said felt tangled. It's actually <b>one shape, reused for every feature</b>. Data flows down through six layers, each doing exactly one job. Here it is, with the file that owns each layer:</p>
+
+      <div class="diagram" aria-label="Six-layer data pipeline">
+        <div class="layers">
+          <div class="layer"><span class="num">1</span><span><span class="lname">Source</span> · <span class="lwhat">the raw truth you edit</span></span><span class="file">ledger.md · content/*.json</span></div>
+          <div class="layer"><span class="num">2</span><span><span class="lname">Importer</span> · <span class="lwhat">reads source → writes DB</span></span><span class="file">backend/import_*.py</span></div>
+          <div class="layer"><span class="num">3</span><span><span class="lname">Database</span> · <span class="lwhat">stores it (tables = classes)</span></span><span class="file">models.py · Neon</span></div>
+          <div class="layer pub"><span class="num">4</span><span><span class="lname">API endpoint</span> · <span class="lwhat">returns JSON over HTTP</span></span><span class="file">backend/main.py</span></div>
+          <div class="layer"><span class="num">5</span><span><span class="lname">Frontend fetch</span> · <span class="lwhat">page asks the API (or falls back)</span></span><span class="file">app/**/page.tsx</span></div>
+          <div class="layer"><span class="num">6</span><span><span class="lname">Render</span> · <span class="lwhat">turns JSON into HTML you see</span></span><span class="file">the same page.tsx</span></div>
+        </div>
+      </div>
+
+      <p><b>Why so many layers?</b> Each boundary buys a freedom:</p>
+      <p>• <b>Source ≠ DB</b> lets the source be a private file on your laptop (the applications ledger never enters the public repo) while the DB holds it privately in the cloud.<br>
+      • <b>Importer</b> is the one-way bridge — <em>you</em> run it, it's where "curate the public subset" happens.<br>
+      • <b>DB ≠ API</b> means the API decides what leaves the building (aggregates only, unless you're authed).<br>
+      • <b>API ≠ page</b> means the frontend and backend deploy and scale independently.</p>
+
+      <h3>One concrete trace: the "129 applications"</h3>
+      <p>Your private ledger (source) → <code>import_ledger.py</code> reads it and writes rows into the <code>applications</code> table (DB) → <code>/api/applications/summary</code> counts them and returns <code>{totalSubmitted: 129, ...}</code> (endpoint) → the Applications page fetches that (frontend) → renders "129" (render). Change the ledger, re-run the importer, refresh — 129 becomes 130. No push.</p>
+
+      <div class="check" data-sec="s5">
+        <div class="check__top"><span>Check 05</span><span>trace</span></div>
+        <div class="check__body">
+          <p class="check__q">You add a job to your ledger but the site still says 129 after refresh. Which layer is the culprit?</p>
+          <div class="opts">
+            <button class="opt" data-ok="1">Layer 2 — the <b>importer</b>. Editing the source doesn't touch the DB until the importer runs. The page reads the DB, which is still at 129.</button>
+            <button class="opt" data-ok="0">Layer 6 — the page didn't re-render.</button>
+            <button class="opt" data-ok="0">Layer 4 — the endpoint is broken.</button>
+          </div>
+          <div class="fb" data-fb="1"><span class="grade">Right.</span> The source and the DB are deliberately separated by the importer bridge. "I changed the source" ≠ "the DB changed." This is the whole reason the pipeline has that seam — and knowing <em>which</em> layer to suspect is what "understanding the design" means.</div>
+          <div class="fb" data-fb="0"><span class="grade">Re-trace it.</span> The page + endpoint faithfully report whatever the DB holds — and the DB is still 129 because nothing wrote to it. The break is upstream: the importer hasn't run.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 06 ============ -->
+    <section class="sec" id="s6">
+      <p class="eyebrow">Part 2 · API design — the layers</p>
+      <h2>06 · Public vs private endpoints</h2>
+      <div class="pain"><span class="lab">Pain</span><p>The DB holds <b>everything</b> — every company you applied to, salaries, notes. But the public site must show <b>only counts</b>. Same data, two very different audiences.</p></div>
+
+      <p>The design answer: the <b>endpoint layer</b> is the gatekeeper. The same <code>applications</code> table is exposed through <em>two</em> endpoints with different rules:</p>
+
+      <div class="diagram" aria-label="Public vs private endpoints">
+        <div class="layers">
+          <div class="layer"><span class="num">DB</span><span><span class="lname">applications table</span> · <span class="lwhat">full private rows</span></span><span class="file">models.py</span></div>
+          <div class="layer pub"><span class="num">A</span><span><span class="lname">/api/applications/summary</span> · <span class="lwhat">counts only — anyone</span></span><span class="file">public</span></div>
+          <div class="layer priv"><span class="num">B</span><span><span class="lname">/api/applications/full</span> · <span class="lwhat">every field — needs the secret</span></span><span class="file">X-Admin-Secret</span></div>
+        </div>
+      </div>
+
+      <p>Endpoint <b>A</b> runs a <code>COUNT(*)</code> and returns aggregates — no company name ever leaves. Endpoint <b>B</b> returns full rows but is <b>fail-closed</b>: without the right secret header it returns <code>401</code>, and if the secret isn't even configured, it <em>still</em> returns 401. Deny by default.</p>
+
+      <pre><code><span class="c"># backend/main.py</span>
+<span class="k">def</span> require_admin(x_admin_secret = Header(default=<span class="k">None</span>)):
+    <span class="k">if not</span> ADMIN_SECRET <span class="k">or</span> x_admin_secret != ADMIN_SECRET:
+        <span class="k">raise</span> HTTPException(status_code=<span class="s">401</span>)   <span class="c"># fail-closed</span>
+
+<span class="c"># public: aggregates only</span>
+@app.get(<span class="s">"/api/applications/summary"</span>)
+<span class="k">def</span> summary(): ...          <span class="c"># returns {totalSubmitted, byStatus, byDate}</span>
+
+<span class="c"># private: gated by the secret</span>
+@app.get(<span class="s">"/api/applications/full"</span>, dependencies=[Depends(require_admin)])
+<span class="k">def</span> full(): ...             <span class="c"># returns every company + note</span></code></pre>
+
+      <div class="callout"><span class="ci">🔑</span><p>The browser <b>never</b> holds that secret. It lives on the servers only. The private <em>page</em> checks your login, then the Next.js <em>server</em> calls endpoint B with the secret — server-to-server. A logged-out visitor never gets near it.</p></div>
+
+      <div class="check" data-sec="s6">
+        <div class="check__top"><span>Check 06</span><span class="cap">selection · /5</span></div>
+        <div class="check__body">
+          <p class="check__q">Why two endpoints instead of one endpoint that returns full data "only if logged in"?</p>
+          <div class="opts">
+            <button class="opt" data-ok="1">Separation = safety. The public path's code literally never touches private fields, so a bug there <b>can't</b> leak them. One combined endpoint would put public and private data in the same code path, one <code>if</code> away from a leak.</button>
+            <button class="opt" data-ok="0">Two endpoints are faster than one.</button>
+            <button class="opt" data-ok="0">FastAPI requires a separate endpoint per response shape.</button>
+          </div>
+          <div class="fb" data-fb="1"><span class="grade">5/5.</span> This is the same reasoning as choosing a separate <code>/private</code> route: put the privacy boundary in the <em>structure</em>, not in a runtime <code>if</code>. Structure can't be forgotten in a refactor. (Rival: one gated endpoint — simpler, but one mistake from exposure.)</div>
+          <div class="fb" data-fb="0"><span class="grade">No.</span> It's not about speed or a framework rule — it's a <b>privacy-by-structure</b> decision. The public code never importing the private fields is the safety property.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 07 ============ -->
+    <section class="sec" id="s7">
+      <p class="eyebrow">Part 3 · Authentication — the wiring</p>
+      <h2>07 · Why a third party (yes — that SMS)</h2>
+      <div class="pain"><span class="lab">Pain</span><p>You need to prove <b>you are you</b> before showing the private ledger. But you do <em>not</em> want to build passwords, store them, handle "forgot password," get hacked. Identity is a whole industry.</p></div>
+
+      <p>So you borrow it. <b>GitHub already knows who you are</b> — it has your password, your 2FA, your phone. Instead of building your own login, you ask GitHub: "is this person really patelinadev? If yes, tell me." That's third-party auth.</p>
+
+      <div class="callout aha"><span class="ci">📱</span><p><b>That surprising SMS was GitHub, not your code.</b> When you clicked "Authorize," GitHub ran <em>its own</em> verification of you — including texting your phone. Your code never saw your password and never saw that SMS code. That's the entire point: you outsourced "prove it's really Lia" to the company that's good at it. Your code only ever receives GitHub's verdict afterward.</p></div>
+
+      <h3>The valet-key analogy</h3>
+      <p>OAuth is a <b>valet key</b>. You don't hand the valet your house keys and wallet (your password). You hand a limited key that only starts the car (a token that can only <code>read:user</code> — your public profile). Your app gets the valet key, uses it once to ask "who is this?", and throws it away. It never learns your password.</p>
+
+      <div class="check" data-sec="s7">
+        <div class="check__top"><span>Check 07</span><span>mental model</span></div>
+        <div class="check__body">
+          <p class="check__q">Where did your GitHub password go in this whole flow?</p>
+          <div class="opts">
+            <button class="opt" data-ok="0">The lia-til backend received it and checked it against GitHub.</button>
+            <button class="opt" data-ok="0">It was stored (hashed) in the Neon database.</button>
+            <button class="opt" data-ok="1">Nowhere near your code. You typed it into <b>GitHub's</b> own page; GitHub verified you (password + that SMS) and handed your app only a short-lived token. Your app never sees the password.</button>
+          </div>
+          <div class="fb" data-fb="1"><span class="grade">Exactly.</span> This is why OAuth exists — the password only ever meets the party that issued it. Your app trusts GitHub's answer instead of handling credentials itself. That's the "magic" demystified.</div>
+          <div class="fb" data-fb="0"><span class="grade">Wrong model — important to fix.</span> If your app ever touched the password, you'd have inherited all the risk you were trying to avoid. It doesn't. You typed it on github.com; your app only gets a token back.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 08 ============ -->
+    <section class="sec" id="s8">
+      <p class="eyebrow">Part 3 · Authentication — the wiring</p>
+      <h2>08 · The OAuth dance, step by step</h2>
+      <p>Now the wiring — every step mapped to a file. Orange steps happen on <b>GitHub</b>; teal steps are <b>your code</b>. Read it twice: this is diagram #2 you need to draw from memory.</p>
+
+      <div class="diagram" aria-label="OAuth authorization-code flow">
+        <div class="flow">
+          <div class="fstep"><span class="sd">1</span><div class="fb"><span class="who">you · any page</span><div class="txt">Click the corner <code>🔒</code> → go to <code>/private</code>.</div></div></div>
+          <div class="fstep"><span class="sd">2</span><div class="fb"><span class="who">code · app/private/page.tsx</span><div class="txt"><code>requireAdmin()</code> finds no session → <code>redirect("/api/auth/login")</code>.</div></div></div>
+          <div class="fstep"><span class="sd">3</span><div class="fb"><span class="who">code · api/auth/login</span><div class="txt">Set a random <b>CSRF state</b> cookie, then redirect to GitHub's authorize URL with <code>client_id</code> + <code>state</code> + <code>scope=read:user</code>.</div></div></div>
+          <div class="fstep ext"><span class="sd">4</span><div class="fb"><span class="who">github.com</span><div class="txt">GitHub verifies <b>you</b> (password, <b>the SMS</b>) and shows "Authorize lia-til?". You click yes.</div></div></div>
+          <div class="fstep ext"><span class="sd">5</span><div class="fb"><span class="who">github.com</span><div class="txt">GitHub redirects back to <code>/api/auth/callback?code=…&amp;state=…</code>. The <code>code</code> is a one-time voucher.</div></div></div>
+          <div class="fstep"><span class="sd">6</span><div class="fb"><span class="who">code · api/auth/callback</span><div class="txt">Check <code>state</code> matches the cookie (anti-CSRF). Then POST the <code>code</code> + <code>client_secret</code> to GitHub → get an <b>access token</b>.</div></div></div>
+          <div class="fstep"><span class="sd">7</span><div class="fb"><span class="who">code → github api</span><div class="txt">Use the token: <code>GET api.github.com/user</code> → <code>{ login: "patelinadev", … }</code>.</div></div></div>
+          <div class="fstep"><span class="sd">8</span><div class="fb"><span class="who">code · the allowlist</span><div class="txt">Is <code>login === ALLOWED_GITHUB_LOGIN</code>? If no → <code>/private/denied</code>. If yes → continue.</div></div></div>
+          <div class="fstep"><span class="sd">9</span><div class="fb"><span class="who">code · lib/session.ts</span><div class="txt"><code>createSession()</code> signs a <b>JWT</b> with your login and drops it in an HttpOnly cookie. Redirect to <code>/private</code>.</div></div></div>
+          <div class="fstep"><span class="sd">10</span><div class="fb"><span class="who">code · app/private/page.tsx</span><div class="txt">This time <code>requireAdmin()</code> finds a valid session → renders the page. Done.</div></div></div>
+        </div>
+      </div>
+
+      <div class="callout"><span class="ci">🧭</span><p><b>Why the <code>state</code> cookie (step 3 &amp; 6)?</b> Without it, an attacker could trick your browser into completing a login they started. The random value you set in step 3 must come back in step 5, or step 6 rejects it. That's CSRF protection — a detail a library would hide, and one you now own.</p></div>
+
+      <div class="check" data-sec="s8">
+        <div class="check__top"><span>Check 08</span><span>the wiring</span></div>
+        <div class="check__body">
+          <p class="check__q">GitHub sends back a <code>code</code> (step 5), not the token directly. Then step 6 swaps it for the token. Why the extra hop?</p>
+          <div class="opts">
+            <button class="opt" data-ok="1">The <code>code</code> travels through the <b>browser</b> (a redirect URL), so it must be harmless if seen. Exchanging it for the real token happens <b>server-to-server</b> with your <code>client_secret</code>, which the browser never holds.</button>
+            <button class="opt" data-ok="0">It's just how GitHub's API happens to work; no real reason.</button>
+            <button class="opt" data-ok="0">The code is the token — step 6 only renames it.</button>
+          </div>
+          <div class="fb" data-fb="1"><span class="grade">Yes.</span> This is the heart of the <em>authorization-code</em> flow: the thing exposed in the browser (the code) is single-use and useless alone; the powerful token is only fetched in a back-channel call that also proves your app's identity with the secret.</div>
+          <div class="fb" data-fb="0"><span class="grade">Re-read step 6.</span> The code and token are different. The two-step design exists precisely so the token never rides through the browser — only the disposable code does.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 09 ============ -->
+    <section class="sec" id="s9">
+      <p class="eyebrow">Part 3 · Authentication — the wiring</p>
+      <h2>09 · Sessions &amp; secrets: who holds what</h2>
+      <p>After login you don't re-do the GitHub dance on every click. Step 9 gave your browser a <b>session cookie</b> — a signed note that says "this is patelinadev, verified." Three different secrets do three different jobs; mixing them up is where the confusion lives:</p>
+
+      <div class="diagram" aria-label="Who holds which secret">
+        <div class="layers">
+          <div class="layer"><span class="num">1</span><span><span class="lname">AUTH_SECRET</span> · <span class="lwhat">signs the session cookie so it can't be forged</span></span><span class="file">Vercel · session.ts</span></div>
+          <div class="layer"><span class="num">2</span><span><span class="lname">GITHUB_CLIENT_SECRET</span> · <span class="lwhat">proves your app to GitHub in step 6</span></span><span class="file">Vercel · callback</span></div>
+          <div class="layer priv"><span class="num">3</span><span><span class="lname">BACKEND_SECRET</span> · <span class="lwhat">frontend→backend password for private data</span></span><span class="file">Vercel AND Render</span></div>
+        </div>
+      </div>
+
+      <p><b>The session cookie</b> is a JWT: a small signed token holding just <code>{ login, name, avatar }</code>. Signed with <code>AUTH_SECRET</code> (HMAC), so if anyone edits the cookie the signature breaks and it's rejected. It's <code>HttpOnly</code> (JavaScript can't read it), <code>Secure</code> (HTTPS only), and expires in 7 days. It holds <b>no</b> GitHub token and no password — the minimum to know it's you.</p>
+
+      <p><code>requireAdmin()</code> is the guard on every private page: read the cookie → verify the signature → check the login is on the allowlist → return the session or redirect to login. And <b>secret #3</b> is the one that bit you: it must be <em>identical</em> on Vercel and Render, because the frontend sends it and the backend checks it. Different values → the backend says 401 → the private table comes back empty.</p>
+
+      <div class="check" data-sec="s9">
+        <div class="check__top"><span>Check 09</span><span>diagnose</span></div>
+        <div class="check__body">
+          <p class="check__q">You log in fine, but <code>/private/applications</code> shows an empty table. Which secret, and why?</p>
+          <div class="opts">
+            <button class="opt" data-ok="0"><code>AUTH_SECRET</code> — the session cookie is invalid.</button>
+            <button class="opt" data-ok="1"><code>BACKEND_SECRET</code> mismatched between Vercel and Render. Login (which uses AUTH_SECRET + GitHub) worked, so the session is fine — but the frontend's server call to <code>/api/applications/full</code> got a 401 because its secret didn't match the backend's.</button>
+            <button class="opt" data-ok="0"><code>GITHUB_CLIENT_SECRET</code> — GitHub rejected the login.</button>
+          </div>
+          <div class="fb" data-fb="1"><span class="grade">Nailed it.</span> "Login worked but private data is empty" is the tell: authentication (secrets 1 &amp; 2) succeeded; the failure is the <em>data</em> call (secret 3). Being able to point to the exact secret from the symptom is what "understanding the wiring" means.</div>
+          <div class="fb" data-fb="0"><span class="grade">Re-trace.</span> If AUTH_SECRET or the GitHub secret were wrong, you couldn't have logged in at all. You did — so the break is downstream, at the frontend→backend data call: BACKEND_SECRET.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section class="sec" id="s10">
+      <p class="eyebrow">Part 4 · Mastery</p>
+      <h2>10 · Reading the code &amp; how it was built</h2>
+      <p>Now open the editor. With the two diagrams in your head, the files read fast. Suggested order — <b>follow one feature down, then follow auth across</b>:</p>
+
+      <pre><code><span class="c"># the pipeline (Part 2), applications feature, top → bottom:</span>
+backend/models.py            <span class="c"># the tables (Application, DailyLog, ...)</span>
+backend/import_ledger.py     <span class="c"># source → DB</span>
+backend/main.py              <span class="c"># /summary (public) + /full (require_admin)</span>
+web/app/applications/page.tsx<span class="c"># fetch + fallback + render</span>
+
+<span class="c"># the auth flow (Part 3), in dance order:</span>
+web/app/api/auth/login/route.ts     <span class="c"># steps 3</span>
+web/app/api/auth/callback/route.ts  <span class="c"># steps 6–9</span>
+web/lib/session.ts                  <span class="c"># the JWT cookie</span>
+web/lib/auth.ts                     <span class="c"># requireAdmin / allowlist</span>
+web/app/private/page.tsx            <span class="c"># the guard in action</span></code></pre>
+
+      <h3>How it was actually built (the git story)</h3>
+      <p>Not all at once — in small, deployable slices, each its own branch → merge → auto-deploy, tagged as it went. <b>P1·S1</b> proved the deploy pipeline with an empty skeleton. <b>P1·S2</b> added the pages. <b>P2·S1</b> stood up the backend for applications. <b>P2·S2</b> moved every content type behind the API (the pipeline). <b>P2·S3</b> added login. Each stage is a version tag (<code>v0.1.0</code> → <code>v0.5.1</code>) and a section in the walkthrough. The lesson: <b>ship a thin end-to-end slice first, then thicken it</b> — you always have a working site.</p>
+
+      <div class="check" data-sec="s10">
+        <div class="check__top"><span>Check 10</span><span class="cap">selection · /5</span></div>
+        <div class="check__body">
+          <p class="check__q">Why build P1·S1 as an <em>empty</em> site that just deploys, instead of building real pages first?</p>
+          <div class="opts">
+            <button class="opt" data-ok="1">To prove the riskiest thing — the "edit → push → live" pipeline — end-to-end before investing in features. A "walking skeleton": thin but complete, so everything after just fills it in.</button>
+            <button class="opt" data-ok="0">Because empty sites are faster to write.</button>
+            <button class="opt" data-ok="0">There was no real reason; it's just the order it happened.</button>
+          </div>
+          <div class="fb" data-fb="1"><span class="grade">5/5.</span> De-risk the integration first. The alternative — build features, integrate/deploy last — hides deploy problems until the end when they're expensive. Walking-skeleton trades a little upfront "boring" work for always having a shippable system.</div>
+          <div class="fb" data-fb="0"><span class="grade">There's a real principle here.</span> It's the <b>walking skeleton</b>: prove the whole pipeline works thin-but-complete, so integration risk is dead before you build features on top.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 11 ============ -->
+    <section class="sec" id="s11">
+      <p class="eyebrow">Part 4 · Mastery</p>
+      <h2>11 · Draw it blindfolded</h2>
+      <p>The bar you set: understand it well enough to <b>draw the diagrams from memory</b>. Close this guide and try both on paper. Then check yourself against the pages above.</p>
+
+      <p><b>Diagram 1 — the pipeline (§05).</b> Six boxes, top to bottom, with the file for each: Source → Importer → DB → Endpoint → Fetch → Render. Then add the fork at the endpoint: one table, two endpoints (public counts / private full behind the secret).</p>
+      <p><b>Diagram 2 — the OAuth dance (§08).</b> Ten steps. Mark which happen on GitHub (4, 5) vs your code. Circle where the password lives (only on GitHub) and where the <code>state</code> cookie is set and checked (3, 6).</p>
+
+      <div class="say">
+        <span class="lab">Say it out loud — the three sentences (this is the interview)</span>
+        <ol>
+          <li>"I chose <b>custom OAuth</b> because <i>Next 16 broke Auth.js and it's one user</i>."</li>
+          <li>"I did <b>not</b> choose <b>Auth.js</b>, because here it <i>depends on the renamed middleware and adds a dependency I don't need</i>."</li>
+          <li>"If <i>I add multiple users or roles</i> changed, I'd switch to <b>a library / hosted provider</b>."</li>
+        </ol>
+        <p style="margin:10px 0 0; font-size:13px; color:var(--ink-soft)">If you can fill those three for OAuth, Postgres, and <code>force-dynamic</code> without notes — you own this project. That's L3: selection.</p>
+      </div>
+
+      <div class="check" data-sec="s11">
+        <div class="check__top"><span>Check 11</span><span>final</span></div>
+        <div class="check__body">
+          <p class="check__q">One sentence, no notes: what is the single job of the <b>importer</b> layer, and what would break if you deleted it?</p>
+          <div class="opts">
+            <button class="opt" data-ok="1">It's the one-way bridge that copies your edited <b>source</b> into the <b>database</b> (and curates the public subset). Delete it and the DB never updates — the site would be frozen at whatever was last imported, no matter how much you edit the source.</button>
+            <button class="opt" data-ok="0">It renders the page; without it the page is blank.</button>
+            <button class="opt" data-ok="0">It's the API endpoint the frontend calls.</button>
+          </div>
+          <div class="fb" data-fb="1"><span class="grade">That's the whole thing.</span> If you got §05, §06, §08 and this — you can draw both diagrams and defend the choices. Take the blindfold test on paper, then ping me to be quizzed for real.</div>
+          <div class="fb" data-fb="0"><span class="grade">Go back to §05.</span> The importer is layer 2 — source→DB. It doesn't render (that's the page) and it isn't the endpoint (that's layer 4). The seam it creates is what lets your source stay private on your laptop.</div>
+        </div>
+      </div>
+
+      <div class="done-banner" id="doneBanner" hidden>
+        <h2>All 12 checks passed 🎉</h2>
+        <p style="margin:0; color:var(--ink)">Now do the paper test in §11. When you can draw both diagrams and say the three sentences for three different choices, tell me — I'll run a real quiz and grade you /5.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  (function () {
+    var KEY = "lia-til-learn-v1";
+    var done = {};
+    try { done = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { done = {}; }
+
+    var checks = document.querySelectorAll(".check");
+    var total = checks.length;
+
+    function tocLink(sec) { return document.querySelector('.toc a[href="#' + sec + '"]'); }
+
+    var ptot = document.getElementById("ptot");
+    if (ptot) ptot.textContent = total;
+
+    function refresh() {
+      var n = 0;
+      checks.forEach(function (c) {
+        var sec = c.getAttribute("data-sec");
+        if (done[sec]) { n++; var l = tocLink(sec); if (l) l.classList.add("done"); }
+      });
+      var pct = total ? Math.round((n / total) * 100) : 0;
+      document.getElementById("pf").style.width = pct + "%";
+      document.getElementById("pc").textContent = n;
+      var banner = document.getElementById("doneBanner");
+      if (banner) banner.hidden = n < total;
+    }
+
+    checks.forEach(function (check) {
+      var sec = check.getAttribute("data-sec");
+      var opts = check.querySelectorAll(".opt");
+      var fbs = check.querySelectorAll(".fb");
+      opts.forEach(function (opt) {
+        opt.addEventListener("click", function () {
+          if (check.dataset.answered) return;
+          check.dataset.answered = "1";
+          var ok = opt.getAttribute("data-ok") === "1";
+          opt.classList.add(ok ? "correct" : "wrong");
+          // reveal the matching feedback
+          var idx = opt.getAttribute("data-ok");
+          fbs.forEach(function (f) {
+            if (f.getAttribute("data-fb") === idx) {
+              f.classList.add("show", ok ? "pass" : "fail");
+            }
+          });
+          // if wrong, also mark which one was right
+          if (!ok) {
+            opts.forEach(function (o) { if (o.getAttribute("data-ok") === "1") o.classList.add("correct"); });
+          }
+          opts.forEach(function (o) { o.disabled = true; o.style.cursor = "default"; });
+          done[sec] = true;
+          try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) {}
+          refresh();
+        });
+      });
+    });
+
+    // scroll-spy
+    var secs = document.querySelectorAll("section.sec");
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          document.querySelectorAll(".toc a").forEach(function (a) { a.classList.remove("active"); });
+          var l = tocLink(e.target.id);
+          if (l) l.classList.add("active");
+        }
+      });
+    }, { rootMargin: "-25% 0px -65% 0px" });
+    secs.forEach(function (s) { spy.observe(s); });
+
+    document.getElementById("reset").addEventListener("click", function () {
+      try { localStorage.removeItem(KEY); } catch (e) {}
+      location.reload();
+    });
+
+    refresh();
+  })();
+</script>
