@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { getFullDailyLog } from "@/lib/private";
+import { getLeetcode } from "@/lib/content.server";
+import DailyLogNav from "./DailyLogNav";
 
 export const metadata = {
   title: "Private · Daily Log",
@@ -12,6 +14,14 @@ export const dynamic = "force-dynamic";
 export default async function PrivateDailyLogPage() {
   await requireAdmin();
   const entries = await getFullDailyLog();
+
+  // Solution links are single-source: a problem's solutionUrl lives in the
+  // LeetCode data and is resolved here by id, so the private log stays in sync
+  // with the public /daily-log and the /leetcode table from one edit.
+  const solutions: Record<number, string> = {};
+  for (const p of getLeetcode().problems) {
+    if (p.solutionUrl) solutions[p.id] = p.solutionUrl;
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
@@ -39,61 +49,7 @@ export default async function PrivateDailyLogPage() {
           No entries returned. Check that <code>BACKEND_SECRET</code> matches between Vercel and Render.
         </p>
       ) : (
-        <div className="flex flex-col gap-5">
-          {entries.map((e) => (
-            <article
-              key={e.date}
-              className="rounded-xl border border-neutral-200 p-5 dark:border-neutral-800"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="font-mono text-sm font-semibold">{e.date}</h2>
-                {e.week && <span className="font-mono text-xs text-neutral-400">{e.week}</span>}
-              </div>
-              {e.summary && <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">{e.summary}</p>}
-              {e.done.length > 0 && (
-                <ul className="mt-3 flex flex-col gap-1.5">
-                  {e.done.map((d, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-                      <span aria-hidden className="text-emerald-500">
-                        ✓
-                      </span>
-                      <span>{d}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {e.leetcode.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {e.leetcode.map((p) =>
-                    p.solutionUrl ? (
-                      <a
-                        key={p.id}
-                        href={p.solutionUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-md bg-neutral-100 px-2 py-0.5 text-xs hover:underline dark:bg-neutral-900"
-                      >
-                        LC {p.id} {p.title}
-                      </a>
-                    ) : (
-                      <span
-                        key={p.id}
-                        className="rounded-md bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500 dark:bg-neutral-900"
-                      >
-                        LC {p.id} {p.title}
-                      </span>
-                    ),
-                  )}
-                </div>
-              )}
-              {e.note && (
-                <p className="mt-3 border-l-2 border-neutral-200 pl-3 text-sm text-neutral-500 dark:border-neutral-700">
-                  📝 {e.note}
-                </p>
-              )}
-            </article>
-          ))}
-        </div>
+        <DailyLogNav entries={entries} solutions={solutions} />
       )}
     </main>
   );
