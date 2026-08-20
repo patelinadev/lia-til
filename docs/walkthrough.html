@@ -262,6 +262,7 @@
     <a href="#p2"><span class="st">Phase 2</span> Cloud Backend <span class="dot dot--you"></span></a>
     <a href="#p2s1"><span class="st">P2·S1</span> Backend + Apps <span class="dot dot--go"></span></a>
     <a href="#p2s2"><span class="st">P2·S2</span> Instant sync <span class="dot dot--go"></span></a>
+    <a href="#p2s3"><span class="st">P2·S3</span> GitHub login <span class="dot dot--you"></span></a>
   </div>
 
   <div class="legend">
@@ -732,6 +733,128 @@ Instance Type   = Free</pre>
     </div>
   </section>
 
+  <!-- ============================ P2 · S3 ============================ -->
+  <section class="stage" id="p2s3">
+    <div class="stage__head">
+      <span class="badge">P2 · S3</span>
+      <h2>GitHub login + private view</h2>
+      <span class="status status--wip">🔧 Needs your config</span>
+      <span class="stage__ver">v0.5.0 (target)</span>
+    </div>
+    <p class="goal">Add a login so <b>only you</b> can see the private full view. Signed in with GitHub, you unlock <code>/private</code> — the full per-company ledger. Everyone else sees the same public, aggregate-only site as before. The code is <b>shipped</b>; it stays inert until you create the OAuth App and set the env vars (Phases A &amp; C below).</p>
+
+    <div class="callout me"><span class="k">Design — why not a library</span><span>This Next version renames <code>middleware</code> → <b>Proxy</b> (<code>proxy.ts</code>), which Auth.js v5 leans on — risky on such a new release. So instead of a library we use the <b>first-party pattern the Next auth docs endorse</b>: the <b>GitHub OAuth2 authorization-code flow</b> + a <b>jose-signed JWT in an HttpOnly cookie</b>. Fewer moving parts, and a real "I implemented OAuth" interview story. A single-user <b>allowlist</b> (<code>ALLOWED_GITHUB_LOGIN</code>) means only your account passes.</span></div>
+
+    <div class="callout"><span class="k">Privacy (option B)</span><span>The private full view lives at its own route <code>/private</code>. The public pages' code <b>never touches</b> private data — so it structurally can't leak. <code>/private</code> is also where the S4 admin editor will live.</span></div>
+
+    <div class="callout me"><span class="k">Secrets rule</span><span><b>You</b> create the OAuth App and generate + paste every secret; <b>I</b> only tell you what each value is and write the code — I never see the values (same as <code>DATABASE_URL</code>).</span></div>
+
+    <!-- Phase A -->
+    <div class="phase"><span class="phase__k">A</span><h3>Create the GitHub OAuth App</h3></div>
+    <p class="phase__note">Your half. This is what mints the Client ID + Secret the login flow needs.</p>
+    <ol class="timeline">
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · github.com</span></div>
+          <h4>New OAuth App</h4>
+          <p>github.com → your avatar → <b>Settings</b> → left sidebar bottom <b>Developer settings</b> → <b>OAuth Apps</b> → <b>New OAuth App</b>.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · github.com</span></div>
+          <h4>Fill the three fields</h4>
+          <ul>
+            <li><b>Application name</b>: <code>lia-til</code> (anything)</li>
+            <li><b>Homepage URL</b>: <code>https://lia-til.vercel.app</code></li>
+            <li><b>Authorization callback URL</b>: <code>https://lia-til.vercel.app/api/auth/callback</code> — <b>must match exactly</b></li>
+          </ul>
+          <p>Leave "Enable Device Flow" unchecked.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">3</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · github.com</span></div>
+          <h4>Grab the two credentials</h4>
+          <p><b>Register application</b> → copy the <b>Client ID</b>. Then <b>Generate a new client secret</b> → copy the <b>Client Secret</b> (shown only once). Keep both for Phase C.</p>
+        </div>
+      </li>
+    </ol>
+
+    <!-- Phase B -->
+    <div class="phase"><span class="phase__k">B</span><h3>The code (already shipped)</h3></div>
+    <p class="phase__note">My half — done &amp; pushed. Here's exactly what's in the repo, for rebuild reference.</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Session</span><div><code>web/lib/session.ts</code> — signs a JWT (HS256, secret <code>AUTH_SECRET</code>) holding just <code>{login, name, avatar}</code> and stores it in an <b>HttpOnly / Secure / SameSite=lax</b> cookie (7 days). Never stores the GitHub token.</div></div>
+      <div class="rb__row"><span class="rb__n">OAuth flow</span><div>Three route handlers under <code>web/app/api/auth/</code>: <code>login</code> (sets a random CSRF <code>state</code> cookie → redirects to GitHub) · <code>callback</code> (checks <code>state</code> → swaps the code for a token → fetches the GitHub user → <b>allowlist check</b> → mints the session → <code>/private</code>) · <code>logout</code> (clears the cookie).</div></div>
+      <div class="rb__row"><span class="rb__n">Gate</span><div><code>web/lib/auth.ts</code> — <code>requireAdmin()</code> redirects non-admins to login; only <code>ALLOWED_GITHUB_LOGIN</code> counts as admin.</div></div>
+      <div class="rb__row"><span class="rb__n">Pages</span><div><code>web/app/private/page.tsx</code> — protected; fetches the full ledger and renders it. <code>/private/denied</code> — friendly refusal for a non-allowed login or a broken round-trip.</div></div>
+      <div class="rb__row"><span class="rb__n">Backend</span><div><code>GET /api/applications/full</code> in <code>backend/main.py</code> returns the full per-company rows, gated by an <code>X-Admin-Secret</code> header (<b>fail-closed</b>: no/wrong secret → 401). The Next server sends it only after verifying your session. Public <code>/summary</code> is unchanged.</div></div>
+      <p class="rb__upd"><b>Data flow:</b> browser → <code>/private</code> (verify session) → server-to-server fetch with the secret → backend full rows. The secret and the full data never reach the browser of a logged-out visitor.</p>
+    </div>
+
+    <!-- Phase C -->
+    <div class="phase"><span class="phase__k">C</span><h3>Set the environment variables</h3></div>
+    <p class="phase__note">Your half. This is what activates the shipped code.</p>
+    <ol class="timeline">
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · terminal</span></div>
+          <h4>Generate two random secrets</h4>
+          <p>Run this twice — one output for <code>AUTH_SECRET</code>, one for <code>BACKEND_SECRET</code>:</p>
+          <pre class="cmd">openssl rand -base64 32</pre>
+        </div>
+      </li>
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · Vercel</span></div>
+          <h4>Add 5 vars on Vercel</h4>
+          <p>Project → Settings → Environment Variables (Production):</p>
+          <ul>
+            <li><code>GITHUB_CLIENT_ID</code> — from A3</li>
+            <li><code>GITHUB_CLIENT_SECRET</code> — from A3</li>
+            <li><code>AUTH_SECRET</code> — 1st <code>openssl</code> output</li>
+            <li><code>ALLOWED_GITHUB_LOGIN</code> — <code>patelinadev</code> (your GitHub username)</li>
+            <li><code>BACKEND_SECRET</code> — 2nd <code>openssl</code> output</li>
+          </ul>
+        </div>
+      </li>
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">3</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · Render</span></div>
+          <h4>Add 1 var on Render</h4>
+          <p>Backend service → Environment → <code>BACKEND_SECRET</code> = <b>the exact same value</b> as Vercel's <code>BACKEND_SECRET</code>. Both services redeploy on save (on Vercel, Redeploy the latest if it doesn't auto-trigger).</p>
+        </div>
+      </li>
+    </ol>
+
+    <!-- Phase D -->
+    <div class="phase"><span class="phase__k">D</span><h3>Verify</h3></div>
+    <ol class="timeline">
+      <li class="step" data-actor="verify">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--go">Verify</span></div>
+          <h4>Log in &amp; see the full ledger</h4>
+          <p>Open <code>https://lia-til.vercel.app/private</code> → redirected to GitHub → <b>Authorize</b> → land back on <code>/private</code> with the full company-by-company table. <b>Sign out</b> works. A logged-out visitor or a different GitHub account gets <code>/private/denied</code>; public <code>/applications</code> still shows aggregates only.</p>
+        </div>
+      </li>
+    </ol>
+
+    <!-- Troubleshooting -->
+    <div class="phase"><span class="phase__k">?</span><h3>Troubleshooting</h3></div>
+    <details><summary><span class="q">Q1</span>GitHub says "redirect_uri mismatch"</summary><div class="a">The OAuth App's <b>Authorization callback URL</b> must be exactly <code>https://lia-til.vercel.app/api/auth/callback</code> — no trailing slash, https, right domain.</div></details>
+    <details><summary><span class="q">Q2</span>I log in but the table is empty</summary><div class="a"><code>BACKEND_SECRET</code> on Vercel and Render don't match (or the backend hasn't redeployed). Make them identical and redeploy the backend.</div></details>
+    <details><summary><span class="q">Q3</span>I get "denied" even though it's me</summary><div class="a"><code>ALLOWED_GITHUB_LOGIN</code> must equal your GitHub username exactly (case doesn't matter). Fix it on Vercel and redeploy.</div></details>
+    <details><summary><span class="q">Q4</span><code>/api/auth/login</code> returns a 500</summary><div class="a"><code>GITHUB_CLIENT_ID</code> isn't set on Vercel yet, or the deploy predates adding it — redeploy after setting the vars.</div></details>
+  </section>
+
   <!-- ============================ VERSION HISTORY ============================ -->
   <div class="phase" style="margin-top:44px"><span class="phase__k">§</span><h3>Version History</h3></div>
   <div class="vhist">
@@ -743,7 +866,8 @@ Instance Type   = Free</pre>
         <tr><td class="v">v0.2.x</td><td>P1 · S2 wrap-up — anonymized Applications dashboard + calendar · System Design tree + per-deck detail pages · "Today I Learned" home + footer</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.3.0</td><td>P2 · S1 — FastAPI (Render) + Postgres (Neon); Applications served live via the aggregate API (dynamic, no rebuild)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.4.0</td><td>P2 · S2 — instant sync for all content: Daily Log · LeetCode · System Design each moved to the backend (table + endpoint + importer + dynamic page)</td><td>✅ Done</td></tr>
-        <tr><td class="v">v0.4.x+</td><td>Phase 2 rest — S3 login + private views · S4 admin editor · S5 retire local sources / scheduled sync</td><td>🗺️ Planned</td></tr>
+        <tr><td class="v">v0.5.0</td><td>P2 · S3 — GitHub login (custom OAuth + jose session) + private <code>/private</code> full-ledger view; backend private endpoint behind a shared secret</td><td>🔧 Code shipped · awaiting config</td></tr>
+        <tr><td class="v">v0.5.x+</td><td>Phase 2 rest — S4 admin editor (Markdown live-preview) · S5 retire local sources / scheduled sync</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
   </div>
