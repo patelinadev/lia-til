@@ -11,7 +11,10 @@ from fastapi import FastAPI
 from sqlalchemy import func, select
 
 from db import Base, SessionLocal, engine
-from models import Application, DailyLog
+from models import Application, DailyLog, LeetcodeProblem
+
+LEETCODE_TRACK = "0x3f Basic Algorithms"
+LEETCODE_TRACK_URL = "https://space.bilibili.com/206214/channel/collectiondetail?sid=842776"
 
 
 @asynccontextmanager
@@ -64,12 +67,53 @@ def applications_summary():
     }
 
 
+@app.get("/api/leetcode")
+def leetcode():
+    """Solved problems in 0x3f plan order (episode, then plan order within it)."""
+    if SessionLocal is None:
+        return {"track": LEETCODE_TRACK, "trackUrl": LEETCODE_TRACK_URL, "updatedAt": None, "problems": []}
+    with SessionLocal() as session:
+        rows = (
+            session.execute(select(LeetcodeProblem).order_by(LeetcodeProblem.seq))
+            .scalars()
+            .all()
+        )
+        problems = [
+            {
+                "id": r.id,
+                "slug": r.slug,
+                "title": r.title,
+                "topics": r.topics or [],
+                "ep": r.ep,
+                "difficulty": r.difficulty,
+                "status": r.status,
+                "date": r.date,
+                "solutionUrl": r.solution_url,
+            }
+            for r in rows
+        ]
+    dates = sorted(p["date"] for p in problems if p["date"])
+    return {
+        "track": LEETCODE_TRACK,
+        "trackUrl": LEETCODE_TRACK_URL,
+        "updatedAt": dates[-1] if dates else None,
+        "problems": problems,
+    }
+
+
 @app.get("/api/daily-log")
 def daily_log():
-    """Curated daily-log entries, newest first."""
+    """Curated daily-log entries, newest first. LeetCode items are enriched with
+    their solution URL from the leetcode table (single source)."""
     if SessionLocal is None:
         return []
     with SessionLocal() as session:
+        sol = {
+            pid: url
+            for pid, url in session.execute(
+                select(LeetcodeProblem.id, LeetcodeProblem.solution_url)
+            ).all()
+        }
         rows = session.execute(select(DailyLog).order_by(DailyLog.date.desc())).scalars().all()
         return [
             {
@@ -78,7 +122,9 @@ def daily_log():
                 "done": r.done or [],
                 "summary": r.summary,
                 "note": r.note,
-                "leetcode": r.leetcode or [],
+                "leetcode": [
+                    {**item, "solutionUrl": sol.get(item.get("id"))} for item in (r.leetcode or [])
+                ],
             }
             for r in rows
         ]
