@@ -56,7 +56,6 @@ function Highlight({ text, query }: { text: string | null; query: string }) {
 
 export default function ApplicationsExplorer({ apps }: { apps: FullApplication[] }) {
   const [q, setQ] = useState("");
-  const [roleQ, setRoleQ] = useState("");
   const [status, setStatus] = useState<string>("All");
 
   // Statuses present in the data, with counts — for the filter chips.
@@ -78,12 +77,11 @@ export default function ApplicationsExplorer({ apps }: { apps: FullApplication[]
   const rows = useMemo(() => {
     return apps.filter((a) => {
       if (status !== "All" && (a.status ?? "—") !== status) return false;
-      if (!fuzzyMatch(roleQ, a.role ?? "")) return false;
       const blob = [a.company, a.role, a.notes].filter(Boolean).join(" ");
       if (!fuzzyMatch(q, blob)) return false;
       return true;
     });
-  }, [apps, q, roleQ, status]);
+  }, [apps, q, status]);
 
   // Stats over the currently shown rows.
   const shownByStatus = useMemo(() => {
@@ -92,8 +90,6 @@ export default function ApplicationsExplorer({ apps }: { apps: FullApplication[]
     return counts;
   }, [rows]);
   const barOrder = Object.keys(BAR_COLOR).filter((s) => shownByStatus[s]);
-
-  const roleQueryForHighlight = `${q} ${roleQ}`.trim();
 
   return (
     <>
@@ -154,19 +150,7 @@ export default function ApplicationsExplorer({ apps }: { apps: FullApplication[]
             <tr>
               <th className="px-3 py-2 font-medium">#</th>
               <th className="px-3 py-2 font-medium">Company</th>
-              <th className="px-3 py-2 font-medium">
-                <div className="flex flex-col gap-1.5">
-                  <span>Role</span>
-                  <input
-                    type="text"
-                    value={roleQ}
-                    onChange={(e) => setRoleQ(e.target.value)}
-                    placeholder="filter role…"
-                    autoComplete="off"
-                    className="w-32 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-normal normal-case tracking-normal text-neutral-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300"
-                  />
-                </div>
-              </th>
+              <th className="px-3 py-2 font-medium">Role</th>
               <th className="px-3 py-2 font-medium">Résumé</th>
               <th className="px-3 py-2 font-medium">Applied</th>
               <th className="px-3 py-2 font-medium">Status</th>
@@ -181,7 +165,7 @@ export default function ApplicationsExplorer({ apps }: { apps: FullApplication[]
                   <Highlight text={a.company} query={q} />
                 </td>
                 <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">
-                  <Highlight text={a.role} query={roleQueryForHighlight} />
+                  <Highlight text={a.role} query={q} />
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-neutral-500">{a.resume}</td>
                 <td className="px-3 py-2 font-mono text-xs text-neutral-500">{a.appliedDate}</td>
@@ -190,8 +174,10 @@ export default function ApplicationsExplorer({ apps }: { apps: FullApplication[]
                     {a.status}
                   </span>
                 </td>
-                <td className="max-w-[220px] px-3 py-2 text-neutral-600 dark:text-neutral-400">
-                  <Highlight text={a.notes} query={q} />
+                <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">
+                  <div className="max-h-20 max-w-[260px] overflow-y-auto whitespace-pre-wrap pr-1 text-[13px] leading-snug">
+                    <Highlight text={a.notes} query={q} />
+                  </div>
                 </td>
               </tr>
             ))}
