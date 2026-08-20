@@ -33,6 +33,22 @@ class LeetcodeProblem(Base):
     solution_url = Column(Text)  # nullable
 
 
+class SDDeck(Base):
+    """One completed System Design deck. `slides` holds the full ordered slide
+    array (eyebrow/title/intro/bullets/notes/quote + a diagram KEY); the diagram
+    components themselves stay in the frontend (web/app/system-design/diagrams.tsx).
+    The 30-deck curriculum route (PHASES) stays static in the frontend — only the
+    decks that actually have content live here."""
+
+    __tablename__ = "sd_decks"
+
+    slug = Column(String(120), primary_key=True)
+    n = Column(Integer)  # position in the 30-deck curriculum
+    title = Column(Text)
+    last_reviewed = Column(String(10))  # "YYYY-MM-DD"
+    slides = Column(JSON)  # list[Slide]
+
+
 class DailyLog(Base):
     """One curated public entry per day (checked items + one-line summary/note).
     Private sections (Success Diary / PhD / etc.) are NOT stored here yet — they

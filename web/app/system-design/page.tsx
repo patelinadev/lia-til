@@ -1,11 +1,17 @@
 import Link from "next/link";
-import { PHASES, REVIEWED, deckSlug } from "./decks";
+import { PHASES, reviewedMap, deckSlug } from "./decks";
+import { getDecks } from "./data";
 
 export const metadata = {
   title: "System Design · Lia's Learning Progress",
 };
 
-export default function SystemDesignPage() {
+// Render at request time so newly-imported decks show up without a rebuild.
+export const dynamic = "force-dynamic";
+
+export default async function SystemDesignPage() {
+  const decks = await getDecks();
+  const REVIEWED = reviewedMap(decks);
   const doneCount = Object.keys(REVIEWED).length;
   const total = PHASES.reduce((n, p) => n + p.decks.length, 0);
 
@@ -39,7 +45,7 @@ export default function SystemDesignPage() {
             <ul className="flex flex-col">
               {phase.decks.map(([n, name]) => {
                 const done = n in REVIEWED;
-                const slug = deckSlug(n);
+                const slug = deckSlug(decks, n);
                 return (
                   <li key={n}>
                     {done && slug ? (
