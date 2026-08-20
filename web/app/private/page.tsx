@@ -26,12 +26,29 @@ export default async function PrivateHubPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-16">
-      <p className="font-mono text-xs uppercase tracking-widest text-neutral-400">Private area</p>
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          href="/"
+          className="text-sm text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-300"
+        >
+          &larr; Learning Progress
+        </Link>
+        <form action="/api/auth/logout" method="post">
+          <button
+            type="submit"
+            className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+          >
+            Sign out
+          </button>
+        </form>
+      </div>
+
+      <p className="mt-6 font-mono text-xs uppercase tracking-widest text-neutral-400">Private area</p>
       <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
         Welcome back, {session.name ?? session.login}
       </h1>
       <p className="mt-2 text-sm text-neutral-500">
-        Only you can see these. Use the bar at the top to jump between the public site and here anytime.
+        Only you can see these. Open the 🔒 in the top-right corner from anywhere to come back here.
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
