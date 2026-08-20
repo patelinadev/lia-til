@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchJsonWithRetry } from "./net";
 
 export type FullApplication = {
   appNum: number;
@@ -11,17 +12,19 @@ export type FullApplication = {
 };
 
 /** Fetch the full ledger from the backend's private endpoint. The shared secret
- * lives only on the server; this is called only after the session is verified. */
-export async function getFullApplications(): Promise<FullApplication[]> {
+ * lives only on the server; this is called only after the session is verified.
+ * Returns `null` if the backend can't be reached through the retry budget (so
+ * the page can tell a transient cold start apart from a genuinely empty ledger);
+ * an empty array means the ledger really has no rows. */
+export async function getFullApplications(): Promise<FullApplication[] | null> {
   const base = process.env.API_URL?.replace(/\/$/, "");
   const secret = process.env.BACKEND_SECRET;
-  if (!base || !secret) return [];
-  const res = await fetch(`${base}/api/applications/full`, {
-    headers: { "x-admin-secret": secret },
-    cache: "no-store",
-  });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { applications: FullApplication[] };
+  if (!base || !secret) return null;
+  const data = await fetchJsonWithRetry<{ applications: FullApplication[] }>(
+    `${base}/api/applications/full`,
+    { headers: { "x-admin-secret": secret } },
+  );
+  if (!data) return null;
   return data.applications ?? [];
 }
 
@@ -35,16 +38,16 @@ export type FullDailyLogEntry = {
 };
 
 /** Fetch the full daily log from the backend's private endpoint (secret-gated).
- * Called only after the admin session is verified. */
-export async function getFullDailyLog(): Promise<FullDailyLogEntry[]> {
+ * Called only after the admin session is verified. Returns `null` when the
+ * backend can't be reached (transient cold start) vs `[]` for a truly empty log. */
+export async function getFullDailyLog(): Promise<FullDailyLogEntry[] | null> {
   const base = process.env.API_URL?.replace(/\/$/, "");
   const secret = process.env.BACKEND_SECRET;
-  if (!base || !secret) return [];
-  const res = await fetch(`${base}/api/daily-log/full`, {
-    headers: { "x-admin-secret": secret },
-    cache: "no-store",
-  });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { entries: FullDailyLogEntry[] };
+  if (!base || !secret) return null;
+  const data = await fetchJsonWithRetry<{ entries: FullDailyLogEntry[] }>(
+    `${base}/api/daily-log/full`,
+    { headers: { "x-admin-secret": secret } },
+  );
+  if (!data) return null;
   return data.entries ?? [];
 }

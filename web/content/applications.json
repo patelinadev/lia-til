@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-08-18",
-  "totalSubmitted": 114,
+  "updatedAt": "2026-08-19",
+  "totalSubmitted": 129,
   "byStatus": {
-    "Applied": 88,
-    "Rejected": 25,
+    "Applied": 102,
+    "Rejected": 26,
     "OA": 1
   },
   "byDate": [
@@ -33,6 +33,10 @@
     },
     {
       "date": "2026-08-18",
+      "count": 15
+    },
+    {
+      "date": "2026-08-19",
       "count": 15
     }
   ]
