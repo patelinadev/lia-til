@@ -864,7 +864,7 @@ Instance Type   = Free</pre>
     </div>
 
     <div class="phase" style="margin-top:28px"><span class="phase__k">+</span><h3>Extended — private view filters + Daily-Log nav (v0.5.2)</h3></div>
-    <p class="phase__note">Make the two private read-views actually usable at scale: a filterable Applications ledger, and a Daily Log you can jump around. <b>Private views only</b> — the public <code>/applications</code> and <code>/daily-log</code> are untouched. <b>Status: 🚧 planned</b> (design approved; interactive HTML mock signed off).</p>
+    <p class="phase__note">Make the two private read-views actually usable at scale: a filterable Applications ledger, and a Daily Log you can jump around. <b>Private views only</b> — the public <code>/applications</code> and <code>/daily-log</code> are untouched. <b>Status: ✅ shipped &amp; live</b> (design approved via an interactive HTML mock, then built as real client components, verified with a throwaway preview harness, and deployed).</p>
 
     <div class="callout me"><span class="k">Design — why client components</span><span>Both private pages are currently <b>server components</b> (async, <code>requireAdmin()</code> + a secret-gated fetch). Filtering, search, and scroll-nav are client-side, so we follow the repo's <b>own pattern</b>: the <code>page.tsx</code> stays server-side (auth + data fetch), then hands the data as props to a new <code>"use client"</code> component — exactly how <code>leetcode/page.tsx</code> feeds <code>LeetCodeExplorer.tsx</code>. Auth and the shared secret never move to the client.</span></div>
 
@@ -879,6 +879,74 @@ Instance Type   = Free</pre>
       <div class="rb__row"><span class="rb__n">Shared helper</span><div><code>web/lib/content.ts</code> — add <code>fuzzyMatch(query, haystack)</code> (token substring-or-subsequence) used by the explorer; keeps the matching logic out of the component and testable.</div></div>
       <p class="rb__upd"><b>No backend change:</b> both pages already receive the full rows/entries from the secret-gated endpoints — this stage is pure client-side read UX on top of that data.</p>
     </div>
+
+    <div class="phase" style="margin-top:28px"><span class="phase__k">+</span><h3>Extended — backend cold-start resilience + keep-warm (v0.5.3)</h3></div>
+    <p class="phase__note">A bug surfaced right after the v0.5.2 deploy: the public <code>/applications</code> total was stuck at <b>114</b> and the private pages were empty, even though the DB already had <b>129</b> (8/19). <b>Status: 🚧 code live · the keep-warm ping is your step (below).</b></p>
+
+    <div class="callout"><span class="k">Root cause — Render cold start</span><span>The backend runs on Render's <b>free tier, which spins the instance down after ~15 min of no traffic</b>; waking it takes <b>~40s</b> (proven: a <code>/health</code> curl took 42s, then returned fresh data). A cold instance fails the first requests fast, so each page fell back to what it had — the public pages to their <b>committed snapshot</b> (<code>applications.json</code> = the "stuck at 114" number) and the private pages to <b>empty</b>. A browser never waits ~40s, so across devices it looked permanently stuck. Nothing was actually broken — the data + API were fine the whole time.</span></div>
+
+    <div class="callout me"><span class="k">Design — 3 layers of defense</span><span><b>①&nbsp;keep-warm ping</b> (prevent cold): an external cron hits <code>/health</code> every 5 min so the idle timer never reaches 15 min. <b>②&nbsp;retry</b> (survive a cold hit): a server-side fetch that <i>waits</i> the instance awake instead of falling back. <b>③&nbsp;fresh snapshot</b> (survive a full outage): keep the committed fallback current. Layer&nbsp;① is the real fix; ②&nbsp;and&nbsp;③ are safety nets. Note: ② and ③ can't be skipped in favour of "just hardcode the number" — a snapshot goes stale on the next application, and the <b>private pages have no snapshot at all</b>, so only the live fetch can fill them.</span></div>
+
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Retry helper</span><div><b>New</b> <code>web/lib/net.ts</code> → <code>fetchJsonWithRetry(url, init, opts)</code>: a server-side fetch that retries within a <b>~50s budget</b> (per-attempt <code>AbortController</code> timeout + a short gap), so a request now <b>waits a cold instance awake</b> — like curl does — and renders live data. A <b>401/403 short-circuits</b> to <code>null</code> (a bad secret won't fix itself by retrying).</div></div>
+      <div class="rb__row"><span class="rb__n">Wired in</span><div>All four backend fetchers now use it — public <code>getSummary()</code> / <code>getDailyLog()</code> and private <code>getFullApplications()</code> / <code>getFullDailyLog()</code> — and those four pages set <code>export const maxDuration = 60</code> so Vercel allows the wait.</div></div>
+      <div class="rb__row"><span class="rb__n">Honest empty states</span><div>The private fetchers now return <code>null</code> (backend unreachable) vs <code>[]</code> (ledger truly empty). The pages show a calm <b>"backend may be waking up — refresh in ~30s"</b> notice for <code>null</code>, instead of the old misleading <code>BACKEND_SECRET</code> error.</div></div>
+      <div class="rb__row"><span class="rb__n">Snapshot + cleanup</span><div>Refreshed <code>web/content/applications.json</code> to the current aggregate (<b>129, 8/19</b>) so even a full outage shows current-ish numbers. Also removed the stale <b>"Updated &lt;date&gt;"</b> line from the public <code>/applications</code> header (it only ever reflected the snapshot's date).</div></div>
+    </div>
+
+    <!-- You: set up the keep-warm ping -->
+    <div class="phase"><span class="phase__k">A</span><h3>Set up the keep-warm ping</h3></div>
+    <p class="phase__note">Your step. Every 5 min &lt; the 15-min spin-down window, so the instance never sleeps. Point it at <code>/health</code> (the lightest endpoint), never a data route.</p>
+    <ol class="timeline">
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · cron-job.org</span></div>
+          <h4>Create a free cron-job.org account</h4>
+          <p>Open <a href="https://cron-job.org" target="_blank" rel="noopener noreferrer">cron-job.org</a> → <b>Sign up</b> (email, free, no card). Recommended over UptimeRobot: exact 5-min intervals and an execution history.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">2</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · cron-job.org</span></div>
+          <h4>Create the cronjob</h4>
+          <ul>
+            <li><b>Title</b>: <code>lia-til keep-warm</code></li>
+            <li><b>URL</b>: <code>https://lia-til.onrender.com/health</code></li>
+            <li><b>Schedule</b>: <b>Every 5 minutes</b> (or the cron expression <code>*/5 * * * *</code>)</li>
+            <li><b>Request method</b>: <code>GET</code></li>
+          </ul>
+          <p><b>Save / Create</b>, then confirm the job is <b>Enabled</b>.</p>
+        </div>
+      </li>
+      <li class="step" data-actor="you">
+        <div class="rail"><div class="marker">3</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--you">You · alternative</span></div>
+          <h4>Or use UptimeRobot</h4>
+          <p>At <a href="https://uptimerobot.com" target="_blank" rel="noopener noreferrer">uptimerobot.com</a> → <b>+ Add New Monitor</b> → Type <b>HTTP(s)</b>, URL <code>https://lia-til.onrender.com/health</code>, Interval <b>5 minutes</b> (free-tier minimum) → <b>Create</b>. Bonus: uptime alerts.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="phase"><span class="phase__k">B</span><h3>Verify</h3></div>
+    <ol class="timeline">
+      <li class="step" data-actor="verify">
+        <div class="rail"><div class="marker">1</div></div>
+        <div class="card">
+          <div class="tags"><span class="tag tag--go">Verify</span></div>
+          <h4>Green pings, warm site</h4>
+          <p>After a few minutes the pinger's history shows <b>200 OK</b> rows. Then <code>/applications</code> loads instantly with the live total, and the private pages fill in — no cold-start lag, no drop to 114. If a ping is ever missed, the retry layer still serves live data (just a slower load).</p>
+        </div>
+      </li>
+    </ol>
+
+    <!-- Troubleshooting -->
+    <div class="phase"><span class="phase__k">?</span><h3>Troubleshooting</h3></div>
+    <details><summary><span class="q">Q1</span>Will an always-on backend blow the free tier?</summary><div class="a">Render free gives <b>750 instance-hours/month</b>; one always-warm service is ~730 hrs, within budget. But that pool is <b>shared across all your free web services</b> — if you spin up another, watch the total.</div></details>
+    <details><summary><span class="q">Q2</span>The number is still stale after an update</summary><div class="a">Live data comes from the DB via the API, so re-run the importer after editing the ledger. The committed <code>applications.json</code> is only the offline fallback — it changes only when you edit + commit it (it's baked in at build time).</div></details>
+
   </section>
 
   <!-- ============================ VERSION HISTORY ============================ -->
@@ -894,7 +962,8 @@ Instance Type   = Free</pre>
         <tr><td class="v">v0.4.0</td><td>P2 · S2 — instant sync for all content: Daily Log · LeetCode · System Design each moved to the backend (table + endpoint + importer + dynamic page)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.0</td><td>P2 · S3 — GitHub login (custom OAuth + jose session) + private <code>/private</code> full-ledger view; backend private endpoint behind a shared secret</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.1</td><td>P2 · S3+ — private area buildout: <code>/private</code> hub + <code>/private/daily-log</code> (private channel) + a signed-in-only site-wide nav to hop between public &amp; private</td><td>✅ Done</td></tr>
-        <tr><td class="v">v0.5.2</td><td>P2 · S3+ — private view read-UX: Applications ledger gets fuzzy search + Role-column filter + status filter + live stats bar; private Daily Log gets a compact left-edge jump rail (week dropdown + year→month→day calendar picker) + LeetCode solution links (resolved by id from <code>leetcode.json</code>, same as public)</td><td>🚧 Planned</td></tr>
+        <tr><td class="v">v0.5.2</td><td>P2 · S3+ — private view read-UX: Applications ledger gets fuzzy search + Role-column filter + status filter + live stats bar; private Daily Log gets a compact left-edge jump rail (week dropdown + year→month→day calendar picker) + LeetCode solution links (resolved by id from <code>leetcode.json</code>, same as public)</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.5.3</td><td>P2 · S3+ — backend cold-start resilience: retry-until-awake fetch (<code>lib/net.ts</code>) + <code>maxDuration=60</code> so cold loads wait for live data instead of dropping to the stale snapshot/empty; null-vs-empty private states; refreshed <code>applications.json</code> fallback; removed the stale public "Updated" line. Keep-warm <code>/health</code> ping = manual (runbook in P2·S3).</td><td>🚧 Code live · ping pending</td></tr>
         <tr><td class="v">v0.5.x+</td><td>Phase 2 rest — S4 admin editor (Markdown live-preview) · S5 retire local sources / scheduled sync</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
