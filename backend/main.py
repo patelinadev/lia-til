@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from sqlalchemy import func, select
 
 from db import Base, SessionLocal, engine
-from models import Application
+from models import Application, DailyLog
 
 
 @asynccontextmanager
@@ -62,3 +62,23 @@ def applications_summary():
         "byStatus": by_status,
         "byDate": by_date,
     }
+
+
+@app.get("/api/daily-log")
+def daily_log():
+    """Curated daily-log entries, newest first."""
+    if SessionLocal is None:
+        return []
+    with SessionLocal() as session:
+        rows = session.execute(select(DailyLog).order_by(DailyLog.date.desc())).scalars().all()
+        return [
+            {
+                "date": r.date,
+                "week": r.week,
+                "done": r.done or [],
+                "summary": r.summary,
+                "note": r.note,
+                "leetcode": r.leetcode or [],
+            }
+            for r in rows
+        ]
