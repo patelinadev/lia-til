@@ -262,7 +262,7 @@
     <a href="#p2"><span class="st">Phase 2</span> Cloud Backend <span class="dot dot--you"></span></a>
     <a href="#p2s1"><span class="st">P2·S1</span> Backend + Apps <span class="dot dot--go"></span></a>
     <a href="#p2s2"><span class="st">P2·S2</span> Instant sync <span class="dot dot--go"></span></a>
-    <a href="#p2s3"><span class="st">P2·S3</span> GitHub login <span class="dot dot--you"></span></a>
+    <a href="#p2s3"><span class="st">P2·S3</span> GitHub login <span class="dot dot--go"></span></a>
   </div>
 
   <div class="legend">
@@ -738,10 +738,10 @@ Instance Type   = Free</pre>
     <div class="stage__head">
       <span class="badge">P2 · S3</span>
       <h2>GitHub login + private view</h2>
-      <span class="status status--wip">🔧 Needs your config</span>
-      <span class="stage__ver">v0.5.0 (target)</span>
+      <span class="status status--done">✅ Done</span>
+      <span class="stage__ver">v0.5.0</span>
     </div>
-    <p class="goal">Add a login so <b>only you</b> can see the private full view. Signed in with GitHub, you unlock <code>/private</code> — the full per-company ledger. Everyone else sees the same public, aggregate-only site as before. The code is <b>shipped</b>; it stays inert until you create the OAuth App and set the env vars (Phases A &amp; C below).</p>
+    <p class="goal">Add a login so <b>only you</b> can see the private full view. Signed in with GitHub, you unlock <code>/private</code> — the full per-company ledger. Everyone else sees the same public, aggregate-only site as before. <b>Live</b> — the OAuth App and env vars are configured; verified end-to-end (logged-out <code>/private</code> redirects to login, the backend's private endpoint is 401 without the shared secret).</p>
 
     <div class="callout me"><span class="k">Design — why not a library</span><span>This Next version renames <code>middleware</code> → <b>Proxy</b> (<code>proxy.ts</code>), which Auth.js v5 leans on — risky on such a new release. So instead of a library we use the <b>first-party pattern the Next auth docs endorse</b>: the <b>GitHub OAuth2 authorization-code flow</b> + a <b>jose-signed JWT in an HttpOnly cookie</b>. Fewer moving parts, and a real "I implemented OAuth" interview story. A single-user <b>allowlist</b> (<code>ALLOWED_GITHUB_LOGIN</code>) means only your account passes.</span></div>
 
@@ -853,6 +853,7 @@ Instance Type   = Free</pre>
     <details><summary><span class="q">Q2</span>I log in but the table is empty</summary><div class="a"><code>BACKEND_SECRET</code> on Vercel and Render don't match (or the backend hasn't redeployed). Make them identical and redeploy the backend.</div></details>
     <details><summary><span class="q">Q3</span>I get "denied" even though it's me</summary><div class="a"><code>ALLOWED_GITHUB_LOGIN</code> must equal your GitHub username exactly (case doesn't matter). Fix it on Vercel and redeploy.</div></details>
     <details><summary><span class="q">Q4</span><code>/api/auth/login</code> returns a 500</summary><div class="a"><code>GITHUB_CLIENT_ID</code> isn't set on Vercel yet, or the deploy predates adding it — redeploy after setting the vars.</div></details>
+    <details><summary><span class="q">Q5</span>I set the vars but still get <code>{"error":"GITHUB_CLIENT_ID not set"}</code></summary><div class="a"><b>The #1 gotcha.</b> Vercel bakes env vars into a deployment <b>at deploy time</b> — a deployment that was already running when you added the var does NOT see it. Fix: after adding/changing any var, <b>Redeploy</b> (Deployments → latest → ⋯ → Redeploy), then retry. Also make sure the var is on <b>Vercel</b> (the frontend), not Render — the "not set" error comes from the Next app, so Render env vars don't help it. Frontend vars → Vercel; backend's <code>BACKEND_SECRET</code> → Render.</div></details>
   </section>
 
   <!-- ============================ VERSION HISTORY ============================ -->
@@ -866,7 +867,7 @@ Instance Type   = Free</pre>
         <tr><td class="v">v0.2.x</td><td>P1 · S2 wrap-up — anonymized Applications dashboard + calendar · System Design tree + per-deck detail pages · "Today I Learned" home + footer</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.3.0</td><td>P2 · S1 — FastAPI (Render) + Postgres (Neon); Applications served live via the aggregate API (dynamic, no rebuild)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.4.0</td><td>P2 · S2 — instant sync for all content: Daily Log · LeetCode · System Design each moved to the backend (table + endpoint + importer + dynamic page)</td><td>✅ Done</td></tr>
-        <tr><td class="v">v0.5.0</td><td>P2 · S3 — GitHub login (custom OAuth + jose session) + private <code>/private</code> full-ledger view; backend private endpoint behind a shared secret</td><td>🔧 Code shipped · awaiting config</td></tr>
+        <tr><td class="v">v0.5.0</td><td>P2 · S3 — GitHub login (custom OAuth + jose session) + private <code>/private</code> full-ledger view; backend private endpoint behind a shared secret</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.x+</td><td>Phase 2 rest — S4 admin editor (Markdown live-preview) · S5 retire local sources / scheduled sync</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
