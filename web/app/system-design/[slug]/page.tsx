@@ -6,7 +6,11 @@ import {
   DiagramStatefulStateless,
   DiagramApiProtocols,
 } from "../diagrams";
-import { DECKS, deckBySlug, type DiagramKey, type Slide } from "../decks";
+import { deckBySlug, type DiagramKey, type Slide } from "../decks";
+import { getDecks } from "../data";
+
+// Render at request time so deck edits go live on refresh, no rebuild.
+export const dynamic = "force-dynamic";
 
 const DIAGRAMS: Record<DiagramKey, () => React.ReactElement> = {
   loadBalanced: DiagramLoadBalanced,
@@ -15,13 +19,9 @@ const DIAGRAMS: Record<DiagramKey, () => React.ReactElement> = {
   apiProtocols: DiagramApiProtocols,
 };
 
-export function generateStaticParams() {
-  return DECKS.map((d) => ({ slug: d.slug }));
-}
-
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const deck = deckBySlug(slug);
+  const deck = deckBySlug(await getDecks(), slug);
   return { title: deck ? `${deck.title} · System Design` : "System Design" };
 }
 
@@ -66,7 +66,7 @@ function SlideCard({ slide }: { slide: Slide }) {
 
 export default async function DeckPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const deck = deckBySlug(slug);
+  const deck = deckBySlug(await getDecks(), slug);
   if (!deck) notFound();
 
   return (

@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from sqlalchemy import func, select
 
 from db import Base, SessionLocal, engine
-from models import Application, DailyLog, LeetcodeProblem
+from models import Application, DailyLog, LeetcodeProblem, SDDeck
 
 LEETCODE_TRACK = "0x3f Basic Algorithms"
 LEETCODE_TRACK_URL = "https://space.bilibili.com/206214/channel/collectiondetail?sid=842776"
@@ -99,6 +99,27 @@ def leetcode():
         "updatedAt": dates[-1] if dates else None,
         "problems": problems,
     }
+
+
+@app.get("/api/system-design")
+def system_design():
+    """Completed System Design decks in curriculum order. Each deck carries its
+    full slide array; the diagram components live in the frontend by key."""
+    if SessionLocal is None:
+        return {"decks": []}
+    with SessionLocal() as session:
+        rows = session.execute(select(SDDeck).order_by(SDDeck.n)).scalars().all()
+        decks = [
+            {
+                "n": r.n,
+                "slug": r.slug,
+                "title": r.title,
+                "lastReviewed": r.last_reviewed,
+                "slides": r.slides or [],
+            }
+            for r in rows
+        ]
+    return {"decks": decks}
 
 
 @app.get("/api/daily-log")
