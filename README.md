@@ -56,7 +56,7 @@ docs/
   - S2 (`v0.2.x`): four section routes — LeetCode (filter/sort/status/colored topics),
     Daily Log timeline, anonymized Applications dashboard + calendar, System Design notes
     with per-deck detail pages
-- **Phase 2 — backend**: FastAPI + PostgreSQL (Railway) — a data source that ingests Lia's
+- **Phase 2 — backend**: FastAPI (Render) + PostgreSQL (Neon), both free — a data source that ingests Lia's
   scattered application / LeetCode data and lets the site sync from it on a schedule
 - **Phase 3 — DevOps**: Docker + GitHub Actions CI/CD + AWS
 

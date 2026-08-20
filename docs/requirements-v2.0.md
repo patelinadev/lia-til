@@ -58,7 +58,7 @@
 ```
 录入： 你 → Claude → 后端 API      |      你 → 后台管理界面(Markdown 编辑器) → 后端 API
                               ↓
-              [ FastAPI + PostgreSQL @ Railway ]   ← 唯一数据源
+        [ FastAPI @ Render (免费) + PostgreSQL @ Neon (免费) ]   ← 唯一数据源
                 ├─ 公开端点（聚合 / 策展，无鉴权）
                 └─ 私有端点（全量，GitHub OAuth 鉴权）
                               ↓
@@ -75,7 +75,7 @@
 
 | Stage | 做什么 | 点亮 |
 |---|---|---|
-| **P2·S1 — 后端骨架 + 投递** | Railway 起 FastAPI + Postgres；`applications` 表 + importer 导入 ledger；公开聚合端点；网站 Applications 改成读它 | 打通 `client→server→DB→deploy`，Python 后端 + DB 简历线 |
+| **P2·S1 — 后端骨架 + 投递** | Render 起 FastAPI + Neon 建 Postgres；`applications` 表 + importer 导入 ledger；公开聚合端点；网站 Applications 改成读它 | 打通 `client→server→DB→deploy`，Python 后端 + DB 简历线 |
 | **P2·S2 — 登录 + 私有查看** | GitHub OAuth；私有端点 + 私有页（全量投递）；服务端鉴权 | 你的核心私有需求 + auth 基座 |
 | **P2·S3 — 后台 buffer + 日志迁移** | 后台管理界面（投递增改 + 学习日志 **Markdown 编辑器实时预览**）；`daily_logs` 表 + 迁 Obsidian 日志；公开时间线改读后端策展子集 | 你能手动改 + 日志上网 |
 | **P2·S4 — Claude 写 API + 定时同步** | 写端点让 Claude 经 API 录入；云端定时任务每天抓取更新，任何地方可跑 | DevOps / 调度线，闭环 |
@@ -91,6 +91,8 @@
 - **后台管理 = Next.js 私有路由页** —— 同一个 app，登录后才可见的 `/admin` 页（不做独立 admin 应用）。
 - **「简历」= 投递里的 `Resume` 字段** —— 随 applications 在 **S1 一起迁**，不单独排。
 - **LeetCode 迁移单独排在后面**（S1 只做投递这条最干净的线；LeetCode 放 S3 之后）。
+
+- **Host = Render（免费 web service）+ DB = Neon（免费 serverless Postgres）** —— 不用 Railway（已砍免费额度，付费对简历无增益）。平台名字不上简历，值钱的是 FastAPI + Postgres + API + auth 这些技能，且应用可移植（Phase 3 再搬 AWS）。
 
 **⏳ 待定（后面单独聊）：**
 - `daily-planner` / `learning-log` skill 迁后端的具体改法。

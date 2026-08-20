@@ -517,7 +517,7 @@ git push origin v0.2.0</pre>
       <span class="status status--wip">🗺️ Planned</span>
       <span class="stage__ver">v0.3.x (target)</span>
     </div>
-    <p class="goal">One cloud <b>FastAPI + PostgreSQL</b> backend as the single source of truth (applications / LeetCode / daily log). You edit in one place; the site fetches the latest on every open; you log in to see full private data. Full design: <code>docs/requirements-v2.0.md</code>.</p>
+    <p class="goal">One cloud backend — <b>FastAPI on Render + PostgreSQL on Neon (both free)</b> — as the single source of truth (applications / LeetCode / daily log). You edit in one place; the site fetches the latest on every open; you log in to see full private data. Full design: <code>docs/requirements-v2.0.md</code>.</p>
 
     <div class="callout me"><span class="k">Decided</span><span>Site reads the backend <b>at request time</b> (dynamic — open = latest, no rebuild). Admin = <b>private routes inside the same app</b>, GitHub-login-gated. Public still gets <b>aggregates only</b> (§6 holds).</span></div>
 
@@ -527,9 +527,9 @@ git push origin v0.2.0</pre>
       <li class="step" data-actor="you">
         <div class="rail"><div class="marker">1</div></div>
         <div class="card">
-          <div class="tags"><span class="tag tag--you">You · Railway</span></div>
-          <h4>Create a Railway project + PostgreSQL</h4>
-          <p>Sign in to Railway, provision a Postgres DB, connect it to the repo's <code>backend/</code>, and set the env vars. Account + secrets are yours — I don't touch credentials.</p>
+          <div class="tags"><span class="tag tag--you">You · Neon + Render</span></div>
+          <h4>Create a Neon database + a Render service (both free)</h4>
+          <p>Create a Postgres DB on <b>Neon</b> (free serverless Postgres); create a free web service on <b>Render</b> connected to the repo's <code>backend/</code>; set <code>DATABASE_URL</code> + env vars. Accounts + secrets are yours — I don't touch credentials. (Not Railway — its free tier is gone and paying adds no résumé value; the host name isn't the skill.)</p>
         </div>
       </li>
       <li class="step" data-actor="me">
