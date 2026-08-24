@@ -128,6 +128,13 @@
   .sec > h2 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: clamp(23px, 3.4vw, 31px); line-height: 1.12; margin: 6px 0 4px; text-wrap: balance; }
   .sec h3 { font-family: "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 18px; margin: 26px 0 6px; }
   .sec p { color: var(--ink-soft); }
+  .sec ul { margin: 10px 0; padding-left: 20px; }
+  .sec > ul li, .sec > p + ul li { color: var(--ink-soft); margin: 6px 0; padding-left: 2px; }
+  .sec li b { color: var(--ink); font-weight: 600; }
+  .need { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; margin: 14px 0; }
+  .need .n { font-weight: 600; color: var(--ink); }
+  .need .a { color: var(--ink-soft); }
+  .need .a b { color: var(--ink); }
   .sec strong, .sec b { color: var(--ink); font-weight: 600; }
   .sec a { color: var(--accent); }
 
@@ -301,7 +308,19 @@
       <h2>01 · Why Next.js + Vercel</h2>
       <div class="pain"><span class="lab">Pain</span><p>You wanted a public site that you could <b>keep changing</b> without emailing files to a server every time — and it had to be free and look decent.</p></div>
 
-      <p>A plain HTML file would work, but the moment you want many pages, shared layout, and "push to update," you're hand-rolling a framework. <b>Next.js</b> gives you file-based routing (a folder = a URL), server rendering, and a first-class host (<b>Vercel</b>) that redeploys on every <code>git push</code>. That auto-deploy pipeline is the reason the very first stage existed: prove "edit → push → live" before building anything real.</p>
+      <p>Start from what the site actually needed — be precise, it's exactly three things:</p>
+      <ul>
+        <li><b>Several pages</b>, not one — LeetCode, Daily Log, Applications…</li>
+        <li>One <b>shared layout</b> — the same header and footer on every page, written once.</li>
+        <li><b>Change it and it's live</b> — update content without hand-uploading files each time.</li>
+      </ul>
+      <p>Plain HTML <em>can</em> make pages, but it meets none of these cleanly: you'd copy the header into every file by hand and build your own deploy step. So the real question is narrow — <b>does Next.js answer these three needs?</b> It does, one for one:</p>
+      <ul>
+        <li><b>Several pages</b> → its <b>file-based routing</b>: in Next.js a <em>folder is a URL</em>. Make the folder <code>app/leetcode/</code> and it becomes the page at <code>/leetcode</code> automatically — no router to set up.</li>
+        <li><b>Shared layout</b> → one <code>layout.tsx</code> file wraps every page, so the header/footer lives in a single place.</li>
+        <li><b>Change it and it's live</b> → <b>Vercel</b> (made by the same team as Next.js) rebuilds and redeploys on every <code>git push</code>.</li>
+      </ul>
+      <p>That is the whole reason it was chosen: <b>each need mapped to a direct answer.</b> Anything else Next.js offers — server rendering, reusable React components — is a bonus we did not pick it <em>for</em>. (And because that third answer is automatic deploy, the very first stage did nothing but prove that pipeline — "edit → push → live" — before building a single real page.)</p>
 
       <div class="decision">
         <div class="decision__h"><b>Next.js + Vercel</b> <span class="pill">frontend</span></div>
