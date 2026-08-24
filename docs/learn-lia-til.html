@@ -353,7 +353,13 @@
       <h2>02 · Why a backend at all — FastAPI + Neon + Render</h2>
       <div class="pain"><span class="lab">Pain</span><p>With everything baked into the site, <b>every content change meant a code change + a rebuild</b>. You wanted one place that holds the truth, and updates that show up instantly. You also wanted the résumé to say "I built a backend."</p></div>
 
-      <p>So Phase 2 added a real backend: a <b>database</b> as the single source of truth, and an <b>API</b> in front of it. Three picks, each with a reason:</p>
+      <p>"Build a backend" is vague — the need actually splits into three separate parts, and each is its own choice:</p>
+      <ul>
+        <li><b>Something to serve the data over the web</b> → an <b>API framework</b>.</li>
+        <li><b>Somewhere to store the truth</b> → a <b>database</b>.</li>
+        <li><b>Somewhere to run the API</b> → a <b>host</b>.</li>
+      </ul>
+      <p>For each part the question is the same as §01: what answers <em>this</em> need best? Three needs, three picks:</p>
 
       <div class="decision">
         <div class="decision__h"><b>FastAPI</b> <span class="pill">the API</span></div>
@@ -406,7 +412,8 @@
       <h2>03 · The instant-sync trick</h2>
       <div class="pain"><span class="lab">Pain</span><p>Even with a backend, if pages were <b>pre-built</b>, a data change still wouldn't show until a rebuild. You wanted: change the data → refresh → it's there.</p></div>
 
-      <p>Next.js normally pre-renders pages at build time (fast, but frozen). The fix is one line per page: <code>export const dynamic = "force-dynamic"</code>. That tells Next "render this <b>on every request</b>," so the page re-fetches the API each time you open it. No rebuild, no <code>git push</code> — the DB is the source, the page just reads it live.</p>
+      <p>The obstacle: by default Next.js <b>pre-builds every page once</b>, at deploy time — fast to serve, but frozen. A later data change can't reach a page that was already turned into static HTML. So the need is narrow: make <em>this</em> page rebuild itself on every visit instead of once.</p>
+      <p>That is exactly what one line does. <code>export const dynamic = "force-dynamic"</code> tells Next "render this page <b>per request</b>," so it re-fetches the API each time it's opened. No rebuild, no <code>git push</code> — the database is the source, the page just reads it live.</p>
 
       <pre><code><span class="c">// web/app/applications/page.tsx</span>
 <span class="k">export const</span> dynamic = <span class="s">"force-dynamic"</span>;   <span class="c">// render per request, not at build</span>
@@ -443,7 +450,7 @@
       <h2>04 · Why custom OAuth, not a library</h2>
       <div class="pain"><span class="lab">Pain</span><p>You needed a login so <b>only you</b> can see the private ledger. The obvious move is a library (Auth.js/NextAuth). But this Next.js is version 16 — brand new — and it renamed <code>middleware</code> to <code>Proxy</code>, which Auth.js v5 leans on. Risky.</p></div>
 
-      <p>So instead of a library we hand-wrote the standard <b>OAuth2 authorization-code flow</b> + a signed session cookie — which is exactly the pattern Next's own docs endorse. For a single user, it's ~120 lines you fully control, and "I implemented OAuth" is a far better interview story than "I installed a library."</p>
+      <p>So walk the logic. The need is a login for <em>one</em> person. The default answer to "add login" is a library — but here the leading one (Auth.js) has a concrete problem on this version, so that answer is off the table. What's left is the thing the library would have done for you anyway: the standard <b>OAuth2 authorization-code flow</b> + a signed session cookie — the exact pattern Next's own docs endorse. At one-user scale that's a few small files you own end to end, and "I implemented OAuth" beats "I installed a library" in an interview.</p>
 
       <div class="decision">
         <div class="decision__h"><b>Custom OAuth + jose session</b> <span class="pill">auth</span></div>
@@ -461,7 +468,7 @@
           <p class="check__q">"Why not just use NextAuth?" Which is the interview-grade answer?</p>
           <div class="opts">
             <button class="opt" data-ok="0">"Writing it myself is more secure than a library."</button>
-            <button class="opt" data-ok="1">"Next 16 renamed middleware→Proxy, which Auth.js v5 depends on, so it was risky on this version. For one user the flow is ~120 lines I control. If I add multiple users or roles, I'd move to a library — it handles the parts I'd rather not own."</button>
+            <button class="opt" data-ok="1">"Next 16 renamed middleware→Proxy, which Auth.js v5 depends on, so it was risky on this version. For one user it's a few small files I control end to end. If I add multiple users or roles, I'd move to a library — it handles the parts I'd rather not own."</button>
             <button class="opt" data-ok="0">"NextAuth is bloated and I don't like dependencies."</button>
           </div>
           <div class="fb" data-fb="0"><span class="grade">≤2/5.</span> "More secure by hand" is a <b>wrong model</b> — rolling your own auth is usually <em>less</em> safe; the honest reason is version compatibility + scope, not superiority. "I don't like dependencies" is taste, not selection.</div>
