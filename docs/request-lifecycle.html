@@ -147,6 +147,13 @@
     </div>
   </div></div>
 
+  <div style="border:1px solid var(--line);border-left:3px solid var(--data);border-radius:12px;background:var(--surface);padding:14px 16px;margin:0 0 30px;font-size:13.5px;color:var(--ink-soft)">
+    <p style="margin:0 0 8px;color:var(--ink)"><b>Why you never "see" the 307</b></p>
+    <p style="margin:0 0 12px">A redirect is a normal HTTP response — the browser <b>follows it on its own</b>, so you only land on the final page (the GitHub login), never a "307" screen. The server says <em>"not here, GET this other URL instead"</em>, and the browser silently sends that next request. That is <b>exactly</b> what you described — you reverse-engineered the 307. To actually watch it: <b>DevTools → Network</b> (tick "Preserve log") → you'll see <code style="font-size:.85em">/private</code> <b>307</b> → <code style="font-size:.85em">/api/auth/login</code> <b>307</b> → github.com.</p>
+    <p style="margin:0 0 5px;color:var(--ink)"><b>Incognito has three states</b> — the branch above is only the first:</p>
+    <p style="margin:0"><b style="color:var(--browser)">①</b> before login → no cookie → <b>307 to login</b> · <b style="color:var(--server)">②</b> logging in → the callback <b>sets the cookie</b> in this incognito session · <b style="color:var(--ret)">③</b> after login, same window → cookie present → <b>the page renders</b> (no 307). A brand-new incognito window is back at ① and re-asks you to log in — that's <b>correct, not a bug</b> (no cookie = must authenticate).</p>
+  </div>
+
   <div class="flow">
 
     <div class="step browser">
