@@ -62,9 +62,11 @@ export default function IndexDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, close]);
 
-  // A click on a link inside the index navigates away — close as it goes.
+  // A click on a link that navigates away closes the drawer as it goes; in-page
+  // TOC anchors (href="#…", which just scroll within the drawer) must NOT close it.
   const onContentClick = (e: MouseEvent) => {
-    if ((e.target as HTMLElement).closest("a")) close();
+    const a = (e.target as HTMLElement).closest("a");
+    if (a && !a.getAttribute("href")?.startsWith("#")) close();
   };
 
   return (

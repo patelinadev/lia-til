@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { getFullDailyLog, getIndex } from "@/lib/private";
+import { getCheckins } from "@/lib/stats";
 import DailyLogExplorer from "@/app/components/DailyLogExplorer";
 import IndexDrawer from "@/app/components/IndexDrawer";
-import SectionBody from "@/app/components/SectionBody";
+import IndexBody from "@/app/components/IndexBody";
+import CheckinStat from "@/app/components/CheckinStat";
 
 export const metadata = {
   title: "Private · Daily Log",
@@ -18,7 +20,11 @@ export default async function PrivateDailyLogPage() {
   await requireAdmin();
   // Solution links come already enriched (by id) from GET /api/daily-log/full,
   // so nothing local is needed here. The INDEX is a small private singleton doc.
-  const [entries, index] = await Promise.all([getFullDailyLog(), getIndex()]);
+  const [entries, index, checkins] = await Promise.all([
+    getFullDailyLog(),
+    getIndex(),
+    getCheckins(),
+  ]);
   const hasIndex = !!index?.value?.trim();
 
   return (
@@ -32,13 +38,18 @@ export default async function PrivateDailyLogPage() {
 
       <div className="mt-6 mb-2 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold sm:text-4xl">Daily Log</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {hasIndex && (
             <IndexDrawer updatedAt={index!.updatedAt} autoOpen>
-              <SectionBody md={index!.value} />
+              <IndexBody md={index!.value} />
             </IndexDrawer>
           )}
-          {entries && <p className="text-sm text-neutral-500">{entries.length} days</p>}
+          {checkins !== null && <CheckinStat days={checkins} />}
+          {entries && (
+            <p className="text-sm text-neutral-500">
+              <span className="text-neutral-300 dark:text-neutral-600">·</span> {entries.length} days
+            </p>
+          )}
         </div>
       </div>
       <p className="mb-8 max-w-2xl text-sm text-neutral-500">

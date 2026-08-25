@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { LogEntry } from "@/lib/content";
 import { fetchJsonWithRetry } from "@/lib/net";
+import { getCheckins } from "@/lib/stats";
 import DataError from "@/app/components/DataError";
 import DailyLogExplorer from "@/app/components/DailyLogExplorer";
+import CheckinStat from "@/app/components/CheckinStat";
 
 export const metadata = {
   title: "Daily Log · Lia's Learning Progress",
@@ -23,7 +25,7 @@ async function getDailyLog(): Promise<LogEntry[] | null> {
 }
 
 export default async function DailyLogPage() {
-  const log = await getDailyLog();
+  const [log, checkins] = await Promise.all([getDailyLog(), getCheckins()]);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-12 sm:py-16">
@@ -34,7 +36,10 @@ export default async function DailyLogPage() {
         &larr; Learning Progress
       </Link>
 
-      <h1 className="mt-6 mb-8 text-3xl font-bold sm:text-4xl">Daily Log</h1>
+      <div className="mt-6 mb-8 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-bold sm:text-4xl">Daily Log</h1>
+        {checkins !== null && <CheckinStat days={checkins} />}
+      </div>
 
       {log === null ? (
         <DataError label="the daily log" />

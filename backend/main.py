@@ -494,6 +494,31 @@ def index_put(body: IndexBody):
         return {"created": created, "value": row.value, "updatedAt": row.updated_at}
 
 
+# A streak week in the INDEX reads "- 2026-W35 (08-24 → 08-30): 1/7"; the
+# numerator is that week's successful check-ins. Summing them = days checked in.
+_STREAK_WEEK = re.compile(r"^\s*-\s*\d{4}-W\d{2}\b[^:]*:\s*(\d+)\s*/\s*\d+\s*$", re.M)
+
+
+def _checkin_days() -> int:
+    """Total days successfully checked in — the sum of the streak-week numerators
+    in the INDEX. The streak (with its human judgement) is the source of truth;
+    a day can have a note without being a check-in, so this is < the day count."""
+    if SessionLocal is None:
+        return 0
+    with SessionLocal() as session:
+        row = session.get(SiteMeta, INDEX_KEY)
+        if not row or not row.value:
+            return 0
+        return sum(int(m.group(1)) for m in _STREAK_WEEK.finditer(row.value))
+
+
+@app.get("/api/checkins")
+def checkins():
+    """Public — just the streak total (days checked in). Only this aggregate
+    integer is exposed; the private INDEX text is never returned on this route."""
+    return {"days": _checkin_days()}
+
+
 # ===========================================================================
 # Applications CRUD (P2·S4). PK = app_num (int). Write bodies use the same
 # camelCase field names the reads return (appNum / appliedDate), so what you

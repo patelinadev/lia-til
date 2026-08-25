@@ -7,6 +7,7 @@ import SectionBody from "@/app/components/SectionBody";
 import DataError from "@/app/components/DataError";
 import TagChips from "@/app/components/TagChips";
 import IndexDrawer from "@/app/components/IndexDrawer";
+import IndexBody from "@/app/components/IndexBody";
 
 export const dynamic = "force-dynamic";
 // Allow the request to wait out a cold backend start (Render free tier ~40s).
@@ -76,7 +77,7 @@ export default async function PrivateDayPage({
         <div className="flex items-center gap-3">
           {hasIndex && (
             <IndexDrawer updatedAt={index!.updatedAt}>
-              <SectionBody md={index!.value} />
+              <IndexBody md={index!.value} />
             </IndexDrawer>
           )}
           {e.week && <span className="font-mono text-sm text-neutral-400">{e.week}</span>}
