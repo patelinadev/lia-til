@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from db import Base, SessionLocal, engine
@@ -28,6 +29,30 @@ def require_admin(x_admin_secret: Optional[str] = Header(default=None)) -> None:
     secret isn't configured at all, the private endpoints stay closed."""
     if not ADMIN_SECRET or x_admin_secret != ADMIN_SECRET:
         raise HTTPException(status_code=401, detail="unauthorized")
+
+
+# ---- Write schemas (P2·S4 CRUD). Pydantic validates the body → 422 on bad shape.
+class DailyLogIn(BaseModel):
+    """Full body for creating/replacing one day (the `date` is the URL path)."""
+    week: Optional[str] = None
+    done: list[str] = Field(default_factory=list)
+    summary: Optional[str] = None
+    note: Optional[str] = None
+    leetcode: list[dict] = Field(default_factory=list)
+
+
+class DailyLogPatch(BaseModel):
+    """Partial update — every field optional; only the ones sent are applied."""
+    week: Optional[str] = None
+    done: Optional[list[str]] = None
+    summary: Optional[str] = None
+    note: Optional[str] = None
+    leetcode: Optional[list[dict]] = None
+
+
+class DailyLogFull(DailyLogIn):
+    """One entry for the bulk endpoint — carries its own `date`."""
+    date: str
 
 
 @asynccontextmanager
@@ -203,3 +228,108 @@ def daily_log_full():
     fields today; the full private per-day sections will land here (behind the
     shared secret) once wired. Gated by X-Admin-Secret (fail-closed)."""
     return {"entries": _daily_log_entries()}
+
+
+# ---------------------------------------------------------------------------
+# Daily-log CRUD (P2·S4 pilot). All write endpoints are X-Admin-Secret-gated.
+# These make Neon the source of truth so a day can be created / edited / deleted
+# from anywhere by API — no local file, no importer. `import_daily_log.py` is
+# superseded by POST /bulk. NOTE: /full is declared above so it wins the route
+# match over /{date}.
+# ---------------------------------------------------------------------------
+
+
+def _serialize_daily(row: DailyLog) -> dict:
+    """The stored row as-is (round-trips with PUT); reads that enrich LeetCode
+    solution links stay in _daily_log_entries()."""
+    return {
+        "date": row.date,
+        "week": row.week,
+        "done": row.done or [],
+        "summary": row.summary,
+        "note": row.note,
+        "leetcode": row.leetcode or [],
+    }
+
+
+def _apply_full(row: DailyLog, body: DailyLogIn) -> None:
+    row.week = body.week
+    row.done = body.done
+    row.summary = body.summary
+    row.note = body.note
+    row.leetcode = body.leetcode
+
+
+@app.get("/api/daily-log/{date}", dependencies=[Depends(require_admin)])
+def daily_log_get(date: str):
+    """PRIVATE — one day's raw stored row (for editing)."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(DailyLog, date)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        return _serialize_daily(row)
+
+
+@app.put("/api/daily-log/{date}", dependencies=[Depends(require_admin)])
+def daily_log_put(date: str, body: DailyLogIn):
+    """PRIVATE — create-or-replace the whole day (upsert)."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(DailyLog, date)
+        created = row is None
+        if created:
+            row = DailyLog(date=date)
+            session.add(row)
+        _apply_full(row, body)
+        session.commit()
+        session.refresh(row)
+        return {"created": created, **_serialize_daily(row)}
+
+
+@app.patch("/api/daily-log/{date}", dependencies=[Depends(require_admin)])
+def daily_log_patch(date: str, body: DailyLogPatch):
+    """PRIVATE — update only the fields sent (404 if the day doesn't exist)."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(DailyLog, date)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        for key, value in body.model_dump(exclude_unset=True).items():
+            setattr(row, key, value)
+        session.commit()
+        session.refresh(row)
+        return _serialize_daily(row)
+
+
+@app.delete("/api/daily-log/{date}", dependencies=[Depends(require_admin)])
+def daily_log_delete(date: str):
+    """PRIVATE — delete one day (404 if it doesn't exist)."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(DailyLog, date)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        session.delete(row)
+        session.commit()
+        return {"deleted": date}
+
+
+@app.post("/api/daily-log/bulk", dependencies=[Depends(require_admin)])
+def daily_log_bulk(entries: list[DailyLogFull]):
+    """PRIVATE — upsert a whole array in one call. Replaces import_daily_log.py."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        for entry in entries:
+            row = session.get(DailyLog, entry.date)
+            if row is None:
+                row = DailyLog(date=entry.date)
+                session.add(row)
+            _apply_full(row, entry)
+        session.commit()
+        return {"upserted": len(entries)}
