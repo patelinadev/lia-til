@@ -263,7 +263,8 @@
     <a href="#p2s1"><span class="st">P2·S1</span> Backend + Apps <span class="dot dot--go"></span></a>
     <a href="#p2s2"><span class="st">P2·S2</span> Instant sync <span class="dot dot--go"></span></a>
     <a href="#p2s3"><span class="st">P2·S3</span> GitHub login <span class="dot dot--go"></span></a>
-    <a href="#p2s4"><span class="st">P2·S4</span> CRUD API <span class="dot dot--you"></span></a>
+    <a href="#p2s4"><span class="st">P2·S4</span> CRUD API <span class="dot dot--go"></span></a>
+    <a href="#p2s5"><span class="st">P2·S5</span> Cloud daily log <span class="dot dot--you"></span></a>
   </div>
 
   <div class="legend">
@@ -545,9 +546,10 @@ git push origin v0.2.0</pre>
         <thead><tr><th>Stage</th><th>What</th><th>Status</th></tr></thead>
         <tbody>
           <tr><td class="v">S1</td><td>Backend skeleton + Applications (Neon + Render + public aggregate endpoint)</td><td>✅ Done (v0.3.0)</td></tr>
-          <tr><td class="v">S2</td><td>GitHub login + private full-applications view</td><td>🗺️ Planned</td></tr>
-          <tr><td class="v">S3</td><td>Admin buffer (Markdown live-preview editor) + daily-log migration</td><td>🗺️ Planned</td></tr>
-          <tr><td class="v">S4</td><td>Claude write-API + daily cloud scheduled sync</td><td>🗺️ Planned</td></tr>
+          <tr><td class="v">S2</td><td>Instant sync — all content moved to the backend (Daily Log · LeetCode · System Design)</td><td>✅ Done (v0.4.0)</td></tr>
+          <tr><td class="v">S3</td><td>GitHub login + private full views (custom OAuth + jose session)</td><td>✅ Done (v0.5.x)</td></tr>
+          <tr><td class="v">S4</td><td>CRUD write API — cloud-only data (all 4 tables; local sources retired)</td><td>✅ Done (v0.6.0)</td></tr>
+          <tr><td class="v">S5</td><td>Cloud-only daily log (full record + tags + rich UI); skills write the API / retire Obsidian</td><td>🚧 In progress (v0.7.x)</td></tr>
         </tbody>
       </table>
     </div>
@@ -955,8 +957,8 @@ Instance Type   = Free</pre>
     <div class="stage__head">
       <span class="badge">P2 · S4</span>
       <h2>CRUD write API — cloud-only data</h2>
-      <span class="status status--wip">🚧 In progress</span>
-      <span class="stage__ver">v0.6.0 (target)</span>
+      <span class="status status--done">✅ Done</span>
+      <span class="stage__ver">v0.6.0</span>
     </div>
     <p class="goal">End goal: <b>get rid of local files.</b> Today the source of truth is local JSON (<code>web/content/*</code> + the private ledger); Claude edits them and a local <code>import_*.py</code> reloads the DB. This stage flips it — <b>Neon becomes the single source of truth</b>, edited through a <b>secret-gated CRUD API</b> in the cloud. After it, every create / update / delete is one HTTP call: no local files, no importer, no laptop in the loop.</p>
 
@@ -1008,16 +1010,58 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
       <p>Each write is live immediately on <code>/private/daily-log</code> — no rebuild, no local step.</p>
     </div>
 
-    <div class="phase"><span class="phase__k">→</span><h3>After the pilot</h3></div>
-    <p class="phase__note">Once daily_logs is proven, the rest of S4/S5:</p>
+    <div class="phase"><span class="phase__k">→</span><h3>S4 done — all three landed</h3></div>
     <div class="card">
       <ul>
         <li>✅ <b>Replicated</b> the CRUD + bulk pattern to applications, leetcode_problems, sd_decks — <b>all 4 tables live</b>.</li>
-        <li>✅ <b>Frontend error states</b>: every public page (<code>/applications</code> · <code>/daily-log</code> · <code>/leetcode</code> · <code>/system-design</code>) now returns <code>null</code> when the backend is unreachable and renders a shared <code>DataError</code> — no more falling back to a stale snapshot. The private daily log also dropped its local <code>getLeetcode()</code> solution map (the endpoint enriches links by id), so nothing on that path reads local files.</li>
+        <li>✅ <b>Frontend error states</b>: every public page (<code>/applications</code> · <code>/daily-log</code> · <code>/leetcode</code> · <code>/system-design</code>) returns <code>null</code> when the backend is unreachable and renders a shared <code>DataError</code> — no more stale-snapshot fallback. The private daily log also dropped its local <code>getLeetcode()</code> solution map (the endpoint enriches links by id).</li>
         <li>✅ <b>Retired local sources</b>: deleted <code>web/content/*</code> (the JSON + 23 log files), <code>lib/content.server.ts</code>, and every <code>backend/import_*.py</code>. The DB is now the single source of truth — recoverable from git history + Neon point-in-time backups, and re-seedable via the bulk endpoints.</li>
-        <li><b>Skills write the API</b>: rewire daily-planner / learning-log to <code>POST</code> the CRUD API instead of editing local files (the end goal).</li>
-        <li><b>Cloud cron</b> (Render Cron Job) for scheduled / automated updates — replaces the local scheduled task. Zero local, zero laptop.</li>
-        <li><b>Study notes (S5)</b>: a new <code>study_notes</code> table (text-first body — SVG/HTML/mermaid inline; no <code>pic</code> column, object storage only if screenshots pile up), with a cloud migration of the Obsidian vault via the bulk API.</li>
+      </ul>
+      <p class="rb__upd"><b>Continues in <a href="#p2s5">P2·S5</a> below:</b> the daily log became fully cloud-native — the whole vault record in the DB, rule-based tags, a unified rich UI, and the API-write flow that lets skills edit the DB directly.</p>
+    </div>
+  </section>
+
+  <!-- ============================ P2 · S5 ============================ -->
+  <section class="stage" id="p2s5">
+    <div class="stage__head">
+      <span class="badge">P2 · S5</span>
+      <h2>Cloud-only daily log — full record, tags, rich UI</h2>
+      <span class="status status--wip">🚧 In progress</span>
+      <span class="stage__ver">v0.7.0</span>
+    </div>
+    <p class="goal">With CRUD live, the daily log became the first <b>fully cloud-native</b> content: the <b>entire</b> Obsidian day is stored in Neon (store everything, filter on read), edited by API (no local files), auto-tagged, and browsed through one public/private explorer. The last mile of S5: rewire the skills to write the API and retire Obsidian.</p>
+
+    <div class="callout me"><span class="k">Write flow — how skills will edit the DB</span><span>Content updates go straight to the CRUD API, no local files. Claude runs <code>source ~/.til-env &amp;&amp; curl -sX PUT …/api/daily-log/{date} -H "x-admin-secret: $BACKEND_SECRET" …</code>. The secret lives ONLY in Lia's git-ignored <code>~/.til-env</code> (chmod 600); the shell substitutes <code>$BACKEND_SECRET</code> at runtime, so Claude never sees the value (always <code>-s</code>, never <code>-v</code>). This <b>is</b> the "skills write the API" mechanism — proven by the migration below; the skill-definition edits (skip Obsidian → API CRUD) are the remaining step.</span></div>
+
+    <div class="phase"><span class="phase__k">A</span><h3>Full record in the DB — store everything, filter on read</h3></div>
+    <p class="phase__note">The Obsidian logs (<code>L's Vault/Calendar/01 - Logs/*.md</code>) were integrated <b>entirely</b> — every section, including private ones — with serving that chooses what each view shows.</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">sections column</span><div>A new <code>daily_logs.sections</code> JSON (<code>{heading → content}</code>) holds the full faithful day (SOP / Tech / Interview / Oral English / Timeline / Success Diary …). Added by an idempotent <code>ALTER TABLE … ADD COLUMN IF NOT EXISTS</code> in the FastAPI lifespan (create_all never alters existing tables).</div></div>
+      <div class="rb__row"><span class="rb__n">Filter on read</span><div>The <b>public</b> <code>GET /api/daily-log</code> <b>never</b> returns <code>sections</code> and hides days with no curated public content; the gated <code>/full</code> returns everything. So Success Diary / interview / advisor / company text is stored but <b>can't leak publicly</b> (verified: the public payload never contains the private section text).</div></div>
+      <div class="rb__row"><span class="rb__n">Migration (cloud-write)</span><div>A one-off job parsed all ~41 vault logs and wrote via the API — 21 existing days PATCHed with sections (public fields preserved), 17 new days PUT (sections-only, hidden publicly until curated). <b>38 days now carry their full record.</b></div></div>
+    </div>
+
+    <div class="phase"><span class="phase__k">B</span><h3>Rule-based tags</h3></div>
+    <p class="phase__note">Tags are <b>derived on the backend</b> from a day's content and merged with any manual tags, so the public endpoint serves them without exposing sections.</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Tier-1 rules</span><div><code>code</code> (fenced block) · <code>leetcode</code> · <code>system-design</code> · <code>phd-application</code> · <code>resume-recruit</code> · <code>interview</code> · <code>oral-english</code> · <code>mindset</code>. <b>Balance:</b> LC/SD/PhD are day-specific focuses so a <b>planned</b> todo counts (loose); <code>resume-recruit</code> reads only <b>completed</b> work + prose (tight), so standing template todos ("出简历bullet", "投递≥5份") don't tag every day.</div></div>
+      <div class="rb__row"><span class="rb__n">Served + searchable</span><div><code>_tags_for(row) = sorted(manual ∪ auto)</code>, returned on both public and private. Tags feed fuzzy search and the tag filter below. Approve the rule once and it re-tags all days (incl. future) automatically.</div></div>
+    </div>
+
+    <div class="phase"><span class="phase__k">C</span><h3>Unified daily-log UI (public + private)</h3></div>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Shared explorer</span><div>One <code>DailyLogExplorer</code> drives both <code>/daily-log</code> (public, inline curated cards) and <code>/private/daily-log</code> (private, compact cards). Fuzzy search over every field; a hideable left filter rail with a <b>calendar popover</b> (year → month → day) + week dropdown; a tri-state <b>tag filter</b> (click a tag: only → hide → off). Week &amp; month &amp; day are mutually exclusive (no more "Week 33 + April → no match").</div></div>
+      <div class="rb__row"><span class="rb__n">Per-day pages</span><div>Private days are long, so each is its own page <code>/private/daily-log/[date]</code>. A <code>SectionBody</code> renderer turns section markdown into checkboxes (<code>- [ ]</code>/<code>- [x]</code>), real tables (Timeline), sub-headings, and <b>syntax-highlighted code blocks</b> (dependency-free tokenizer). Empty template sections (an untouched Success Diary) are dropped. A fixed vertical ↑/↓ pager jumps to the next/previous day.</div></div>
+      <div class="rb__row"><span class="rb__n">Filter in the URL</span><div>The whole filter (fuzzy / week / month / day / tri-state tags) lives in the URL (<code>?q&amp;w&amp;m&amp;d&amp;tin&amp;tex</code>), so it <b>persists</b> across navigation and the per-day ↑/↓ pager <b>respects it</b> — under a <code>leetcode</code> filter, a day's ↓ goes to the next <i>leetcode</i> day, and ↑ greys out at the newest match. Shareable.</div></div>
+    </div>
+
+    <div class="phase"><span class="phase__k">→</span><h3>Remaining S5</h3></div>
+    <div class="card">
+      <ul>
+        <li><b>Skills write the API</b> (next): rewire daily-planner / learning-log to <code>POST</code> the CRUD API — <b>skip Obsidian, edit the DB directly</b>. The write mechanism is proven; only the skill-definition edits remain.</li>
+        <li><b>English summaries</b>: the migrated days have no one-line <code>summary</code> yet (the vault has none) — curate them so those days surface on the public timeline.</li>
+        <li><b>Study notes</b>: a separate <code>study_notes</code> table (text-first body — SVG/HTML/mermaid inline; object storage only if screenshots pile up).</li>
+        <li><b>Cloud cron</b> (Render Cron Job) for scheduled / automated updates — zero local, zero laptop.</li>
       </ul>
     </div>
   </section>
@@ -1037,8 +1081,9 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
         <tr><td class="v">v0.5.1</td><td>P2 · S3+ — private area buildout: <code>/private</code> hub + <code>/private/daily-log</code> (private channel) + a signed-in-only site-wide nav to hop between public &amp; private</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.2</td><td>P2 · S3+ — private view read-UX: Applications ledger gets fuzzy search + Role-column filter + status filter + live stats bar; private Daily Log gets a compact left-edge jump rail (week dropdown + year→month→day calendar picker) + LeetCode solution links (resolved by id from <code>leetcode.json</code>, same as public)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.3</td><td>P2 · S3+ — backend cold-start resilience: retry-until-awake fetch (<code>lib/net.ts</code>) + <code>maxDuration=60</code> so cold loads wait for live data instead of dropping to the stale snapshot/empty; null-vs-empty private states; refreshed <code>applications.json</code> fallback; removed the stale public "Updated" line. Keep-warm <code>/health</code> ping = manual (runbook in P2·S3).</td><td>🚧 Code live · ping pending</td></tr>
-        <tr><td class="v">v0.6.0</td><td>P2 · S4 — CRUD write API (cloud-only data): secret-gated Create/Update/Delete + bulk per table; Neon becomes the single source of truth; local <code>web/content/*.json</code> + importers retire; public pages switch to error states (no fallback); scheduled task moves to a cloud cron. <b>CRUD + bulk for all 4 tables live; error states + local-source retirement done</b> (web/content + importers deleted, DB is the single source of truth). Remaining: skills write the API directly, cloud cron.</td><td>🚧 In progress</td></tr>
-        <tr><td class="v">v0.6.x+</td><td>Phase 2 rest — S5 retire local sources end-to-end (skills write the API directly; Obsidian + jd-based-resume files retire) · cloud scheduled sync</td><td>🗺️ Planned</td></tr>
+        <tr><td class="v">v0.6.0</td><td>P2 · S4 — CRUD write API (cloud-only data): secret-gated Create/Update/Delete + bulk per table (all 4 tables); Neon becomes the single source of truth; local <code>web/content/*</code> + importers deleted; public pages switch to error states (no fallback)</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.7.0</td><td>P2 · S5 — cloud-only daily log: full vault record stored in a <code>sections</code> column (store-everything, filter-on-read; 38 days migrated via the API); rule-based tags (served public+private); unified public/private explorer (fuzzy + calendar/week/tri-state-tag filters, filter persisted in the URL); per-day pages with checkbox/table/code-highlight rendering + ↑/↓ pager; the <code>~/.til-env</code> secret write-flow (skills → API)</td><td>🚧 In progress</td></tr>
+        <tr><td class="v">v0.7.x+</td><td>S5 last mile — rewire skills (daily-planner / learning-log) to write the CRUD API &amp; skip Obsidian · English summaries for migrated days · <code>study_notes</code> table · cloud scheduled sync (Render Cron)</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
   </div>

@@ -306,4 +306,19 @@ if (!session) redirect("/api/auth/login");   <span class="cm">// requireAdmin bo
       <li><b>Data out (step 5)</b> → FastAPI returns <code>{ total, applications: [...] }</code>, but only after the secret matches. Reached only if step 3 said "yes".</li>
     </ul>
   </div>
+
+  <div class="keys" style="margin-top:8px">
+    <h2>The other direction — writing the DB (CRUD)</h2>
+    <p style="margin:0 0 12px;color:var(--ink-soft);font-size:14px">The trace above is a <b>read</b> that starts in the browser and passes <b>both</b> gates. A <b>write</b> has no browser and no session — it's a direct call carrying only <b class="kk" style="color:var(--key)">gate ②</b>'s <code>BACKEND_SECRET</code>. This is how the daily log / tags / sections are edited now — no local files:</p>
+    <div class="code"><span class="cm"># a skill / script / cloud cron — never the browser</span>
+source ~/.til-env   <span class="cm"># loads BACKEND_SECRET (chmod 600, git-ignored; the value is never printed)</span>
+curl -sX PUT https://lia-til.onrender.com/api/daily-log/2026-08-19 \
+  -H "x-admin-secret: $BACKEND_SECRET" -H "content-type: application/json" \
+  -d '{"week":"W34","sections":{"Tech":"…"},"tags":["leetcode"]}'</div>
+    <div class="ret" style="margin-top:8px"><span class="lab">→ FastAPI</span> <code>require_admin</code> (gate ②) checks the secret · <b>Pydantic</b> validates the body (bad shape → <code>422</code>) · the row is written to Neon · <b>live instantly</b> on <code>/private/daily-log</code>, no rebuild, no local step.</div>
+    <ul style="margin-top:12px">
+      <li><b>Only gate ② runs.</b> No <code>lt_session</code> cookie, no <code>AUTH_SECRET</code> — that's a browser-session thing; a write authenticates purely with the shared <code>BACKEND_SECRET</code> (the shell expands <code>$BACKEND_SECRET</code>, so its value is never seen or logged).</li>
+      <li><b>The secret boundary is the same as the read.</b> Private <code>sections</code> are stored but the public <code>GET /api/daily-log</code> filters them out — Success Diary / interview / company text can't leak.</li>
+    </ul>
+  </div>
 </div>
