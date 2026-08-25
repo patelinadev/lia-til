@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { getFullDailyLog } from "@/lib/private";
+import { getFullDailyLog, getIndex } from "@/lib/private";
 import { realSections, filterEntries, filterToQuery, parseFilter } from "@/lib/daily";
 import SectionBody from "@/app/components/SectionBody";
 import DataError from "@/app/components/DataError";
 import TagChips from "@/app/components/TagChips";
+import IndexDrawer from "@/app/components/IndexDrawer";
 
 export const dynamic = "force-dynamic";
 // Allow the request to wait out a cold backend start (Render free tier ~40s).
@@ -30,7 +31,8 @@ export default async function PrivateDayPage({
   for (const [k, v] of Object.entries(sp)) if (typeof v === "string") usp.set(k, v);
   const filter = parseFilter(usp);
   const query = filterToQuery(filter);
-  const entries = await getFullDailyLog();
+  const [entries, index] = await Promise.all([getFullDailyLog(), getIndex()]);
+  const hasIndex = !!index?.value?.trim();
 
   const back = (
     <Link
@@ -69,9 +71,16 @@ export default async function PrivateDayPage({
 
       <DaySideNav older={older} newer={newer} query={query} />
 
-      <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-3">
+      <div className="mt-6 mb-2 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-mono text-2xl font-bold sm:text-3xl">{e.date}</h1>
-        {e.week && <span className="font-mono text-sm text-neutral-400">{e.week}</span>}
+        <div className="flex items-center gap-3">
+          {hasIndex && (
+            <IndexDrawer updatedAt={index!.updatedAt}>
+              <SectionBody md={index!.value} />
+            </IndexDrawer>
+          )}
+          {e.week && <span className="font-mono text-sm text-neutral-400">{e.week}</span>}
+        </div>
       </div>
       {e.summary && <p className="mt-1 text-neutral-700 dark:text-neutral-300">{e.summary}</p>}
 

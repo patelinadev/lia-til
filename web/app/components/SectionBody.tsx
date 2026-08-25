@@ -57,12 +57,31 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   );
 }
 
-/** Minimal inline markdown: **bold** and `code` (everything else stays literal). */
+/** Minimal inline markdown: [text](url) links, **bold**, and `code` (everything
+ * else stays literal). Internal links (starting with "/") render as a normal
+ * `<a>` — a full navigation, which is exactly what we want when a link inside the
+ * Index drawer jumps you to a day page (the drawer closes as the page changes). */
 function Inline({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  const parts = text.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|`[^`]+`)/g);
   return (
     <>
       {parts.map((p, i) => {
+        const link = p.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (link) {
+          const [, label, href] = link;
+          const external = /^https?:\/\//.test(href);
+          return (
+            <a
+              key={i}
+              href={href}
+              {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+              className="text-blue-600 underline decoration-blue-600/30 underline-offset-2 transition-colors hover:decoration-blue-600 dark:text-blue-400 dark:decoration-blue-400/30 dark:hover:decoration-blue-400"
+            >
+              {label}
+              {external && <span aria-hidden className="ml-0.5 text-[0.85em] opacity-70">↗</span>}
+            </a>
+          );
+        }
         if (p.startsWith("**") && p.endsWith("**")) {
           return (
             <strong key={i} className="font-semibold text-neutral-800 dark:text-neutral-200">
