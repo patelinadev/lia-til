@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { getFullDailyLog } from "@/lib/private";
-import DailyLogNav from "./DailyLogNav";
+import DailyLogExplorer from "@/app/components/DailyLogExplorer";
 
 export const metadata = {
   title: "Private · Daily Log",
@@ -49,7 +49,7 @@ export default async function PrivateDailyLogPage() {
           The log is empty — no entries have been imported yet.
         </p>
       ) : (
-        <DailyLogNav entries={entries} />
+        <DailyLogExplorer entries={entries} variant="private" />
       )}
     </main>
   );
