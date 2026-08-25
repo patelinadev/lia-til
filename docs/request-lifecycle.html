@@ -103,26 +103,33 @@
   <p class="hint">Grey code lines starting with <code>//</code> or <code>#</code> are comments. <b>→ returns</b> shows the actual value that line/call hands back.</p>
 
   <h2 style="font-family:'Fraunces',serif;font-weight:600;font-size:20px;margin:6px 0 4px">The shape — arrows &amp; returns</h2>
-  <p style="margin:0 0 6px;font-size:13px;color:var(--ink-faint)"><b style="color:var(--ink)">Solid ▸</b> = a request (going out) · <b style="color:var(--ink)">dashed ◂</b> = the response coming back. Read top to bottom.</p>
-  <div style="overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 30px">
-  <pre class="mermaid">%%{init: {'theme':'neutral'}}%%
-sequenceDiagram
-    participant B as 🧑 Browser
-    participant V as 🟢 Vercel server
-    participant F as 🟠 FastAPI + Neon
-    B->>V: GET /private/applications (+ lt_session cookie)
-    Note over V: requireAdmin() → getSession()<br/>verify JWT with AUTH_SECRET
-    Note over V: → { login: "patelinadev", … }  (session ok)
-    V->>F: GET /api/applications/full<br/>header x-admin-secret: BACKEND_SECRET
-    Note over F: secret matches → query Neon DB
-    F-->>V: { total: 129, applications: [ … ] }
-    Note over V: build the HTML table
-    V-->>B: HTML (the page you see)
-    Note over B,F: — incognito (no cookie) —
-    B->>V: GET /private/applications (no cookie)
-    Note over V: getSession() → null
-    V-->>B: 307 → /api/auth/login  (FastAPI never called)
-  </pre>
+  <p style="margin:0 0 10px;font-size:13px;color:var(--ink-faint)"><b style="color:var(--server)">───▶ solid</b> = a request going out · <b style="color:var(--ret)">◀╌╌ dashed</b> = the response coming back · <b style="color:var(--ink)">⟳</b> = work happening inside one machine. Read top to bottom.</p>
+  <style>
+    .ladder { display:flex; flex-direction:column; gap:9px; margin:0 0 30px; }
+    .m { border:1px solid var(--line); border-radius:10px; padding:9px 13px; background:var(--surface); overflow-x:auto; }
+    .m .ln { font-family:"IBM Plex Mono",monospace; font-size:13px; font-weight:600; color:var(--ink); white-space:nowrap; }
+    .m .ln .ar { color:var(--server); letter-spacing:-1px; margin:0 5px; }
+    .m.ret { border-left:3px solid var(--ret); background:var(--surface-2); }
+    .m.ret .ln .ar { color:var(--ret); }
+    .m.req { border-left:3px solid var(--server); }
+    .m .lb { font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-soft); margin-top:3px; white-space:nowrap; }
+    .m .lb .mut { color:var(--ink-faint); }
+    .note-r { text-align:center; font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-faint); padding:1px 6px; overflow-x:auto; white-space:nowrap; }
+    .brk { text-align:center; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--warn); margin:8px 0 2px; }
+  </style>
+  <div class="ladder">
+    <div class="m req"><div class="ln">Browser <span class="ar">───▶</span> Vercel</div><div class="lb">GET /private/applications <span class="mut">(+ lt_session cookie)</span></div></div>
+    <div class="note-r">⟳ Vercel: verify JWT with AUTH_SECRET → session = { login: "patelinadev" } ✓</div>
+    <div class="m req"><div class="ln">Vercel <span class="ar">───▶</span> FastAPI</div><div class="lb">GET /api/applications/full <span class="mut">(header x-admin-secret)</span></div></div>
+    <div class="note-r">⟳ FastAPI: secret matches → query Neon DB</div>
+    <div class="m ret"><div class="ln">Vercel <span class="ar">◀╌╌╌</span> FastAPI</div><div class="lb">{ total: 129, applications: [ … ] }</div></div>
+    <div class="note-r">⟳ Vercel: build the HTML table</div>
+    <div class="m ret"><div class="ln">Browser <span class="ar">◀╌╌╌</span> Vercel</div><div class="lb">HTML (the page you see)</div></div>
+
+    <div class="brk">— incognito · no cookie —</div>
+    <div class="m req"><div class="ln">Browser <span class="ar">───▶</span> Vercel</div><div class="lb">GET /private/applications <span class="mut">(no cookie)</span></div></div>
+    <div class="note-r">⟳ Vercel: getSession() → null</div>
+    <div class="m ret"><div class="ln">Browser <span class="ar">◀╌╌╌</span> Vercel</div><div class="lb">307 → /api/auth/login <span class="mut">(FastAPI never called)</span></div></div>
   </div>
 
   <div class="flow">
