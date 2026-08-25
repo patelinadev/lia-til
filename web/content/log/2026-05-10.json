@@ -1,7 +1,0 @@
-{
-  "date": "2026-05-10",
-  "week": "W19",
-  "done": [],
-  "summary": null,
-  "note": "Opposite-direction two-pointer template (move the end that can improve the result); LC 42 Trapping Rain Water — prefix+suffix idea + two-pointer O(1)-space optimization"
-}

@@ -1,9 +1,0 @@
-{
-  "date": "2026-07-15",
-  "week": "W29",
-  "done": [
-    "System Design #1: Client/Server + Stateless"
-  ],
-  "summary": null,
-  "note": "Externalize state to Redis/DB to keep the server stateless; the 3 System-Design interview triggers + a 4-step answer (concede → classify → cost → mitigate)"
-}

@@ -1,7 +1,0 @@
-{
-  "date": "2026-04-17",
-  "week": "W16",
-  "done": [],
-  "summary": null,
-  "note": "List vs Set vs Dict — core differences and complexity; the O(n log n) sorting lower bound; Hash & Complexity interview lines + a general Hash Set template"
-}

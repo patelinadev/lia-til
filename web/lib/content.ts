@@ -1,5 +1,5 @@
 // Client-safe types and pure helpers (no fs). Safe to import from Client Components.
-// Filesystem readers live in ./content.server.
+// All content is served from the DB via the backend API; there are no local sources.
 
 export type Difficulty = "Easy" | "Medium" | "Hard";
 
