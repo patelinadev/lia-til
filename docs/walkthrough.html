@@ -973,15 +973,15 @@ Instance Type   = Free</pre>
         <thead><tr><th>Table (PK)</th><th>Create / Upsert</th><th>Read</th><th>Update</th><th>Delete</th><th>Bulk</th></tr></thead>
         <tbody>
           <tr><td>daily_logs (date)</td><td>PUT /{date}</td><td>GET /full ✅ · /{date}</td><td>PATCH /{date}</td><td>DELETE /{date}</td><td>POST /bulk</td></tr>
-          <tr><td>applications (app_num)</td><td>POST</td><td>GET /full ✅ · /{n}</td><td>PATCH /{n}</td><td>DELETE /{n}</td><td>POST /bulk</td></tr>
-          <tr><td>leetcode_problems (id)</td><td>POST</td><td>GET ✅ · /{id}</td><td>PATCH /{id}</td><td>DELETE /{id}</td><td>POST /bulk</td></tr>
-          <tr><td>sd_decks (slug)</td><td>POST</td><td>GET ✅ · /{slug}</td><td>PATCH /{slug}</td><td>DELETE /{slug}</td><td>POST /bulk</td></tr>
+          <tr><td>applications (app_num)</td><td>PUT /{n}</td><td>GET /full ✅ · /{n}</td><td>PATCH /{n}</td><td>DELETE /{n}</td><td>POST /bulk</td></tr>
+          <tr><td>leetcode_problems (id)</td><td>PUT /{id}</td><td>GET ✅ · /{id}</td><td>PATCH /{id}</td><td>DELETE /{id}</td><td>POST /bulk</td></tr>
+          <tr><td>sd_decks (slug)</td><td>PUT /{slug}</td><td>GET ✅ · /{slug}</td><td>PATCH /{slug}</td><td>DELETE /{slug}</td><td>POST /bulk</td></tr>
         </tbody>
       </table>
     </div>
 
-    <div class="phase"><span class="phase__k">A</span><h3>Pilot — daily_logs (this step)</h3></div>
-    <p class="phase__note">Build the pattern once on daily_logs, prove it end-to-end, then replicate to the other 3 tables.</p>
+    <div class="phase"><span class="phase__k">A</span><h3>Pilot — daily_logs → then all 4 tables</h3></div>
+    <p class="phase__note">Built the pattern once on daily_logs, <b>proven live</b> (create / patch / delete against Neon, no local step), then <b>replicated to all 4 tables</b>. Every table now has the same unified surface: <code>GET /{pk}</code> · <code>PUT /{pk}</code> (upsert) · <code>PATCH /{pk}</code> · <code>DELETE /{pk}</code> · <code>POST /bulk</code>. Verified by a 40-assertion local SQLite smoke test (CRUD, camelCase alias round-trips, date parsing, 401/422, and every existing read route un-shadowed).</p>
     <div class="card rb">
       <div class="rb__row"><span class="rb__n">Schemas</span><div>Pydantic <code>DailyLogIn</code> (full body: <code>week</code> / <code>done[]</code> / <code>summary</code> / <code>note</code> / <code>leetcode[]</code>) + <code>DailyLogPatch</code> (all fields optional; served with <code>exclude_unset</code> so PATCH touches only what you send).</div></div>
       <div class="rb__row"><span class="rb__n">Upsert</span><div><code>PUT /api/daily-log/{date}</code> — create-or-replace that whole day (matches the "write today's log" habit). Gated.</div></div>
@@ -1012,7 +1012,7 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
     <p class="phase__note">Once daily_logs is proven, the rest of S4/S5:</p>
     <div class="card">
       <ul>
-        <li><b>Replicate</b> the CRUD + bulk pattern to applications, leetcode_problems, sd_decks.</li>
+        <li>✅ <b>Replicated</b> the CRUD + bulk pattern to applications, leetcode_problems, sd_decks — <b>all 4 tables live</b>.</li>
         <li><b>Retire local sources</b>: seed each table via its bulk endpoint, then delete <code>web/content/*.json</code>, the ledger dependency, and every <code>import_*.py</code>.</li>
         <li><b>Frontend</b>: replace each fallback with an <b>error state</b> (no snapshot).</li>
         <li><b>Cloud cron</b> (Render Cron Job) for scheduled / automated updates — replaces the local scheduled task. Zero local, zero laptop.</li>
@@ -1035,7 +1035,7 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
         <tr><td class="v">v0.5.1</td><td>P2 · S3+ — private area buildout: <code>/private</code> hub + <code>/private/daily-log</code> (private channel) + a signed-in-only site-wide nav to hop between public &amp; private</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.2</td><td>P2 · S3+ — private view read-UX: Applications ledger gets fuzzy search + Role-column filter + status filter + live stats bar; private Daily Log gets a compact left-edge jump rail (week dropdown + year→month→day calendar picker) + LeetCode solution links (resolved by id from <code>leetcode.json</code>, same as public)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.3</td><td>P2 · S3+ — backend cold-start resilience: retry-until-awake fetch (<code>lib/net.ts</code>) + <code>maxDuration=60</code> so cold loads wait for live data instead of dropping to the stale snapshot/empty; null-vs-empty private states; refreshed <code>applications.json</code> fallback; removed the stale public "Updated" line. Keep-warm <code>/health</code> ping = manual (runbook in P2·S3).</td><td>🚧 Code live · ping pending</td></tr>
-        <tr><td class="v">v0.6.0</td><td>P2 · S4 — CRUD write API (cloud-only data): secret-gated Create/Update/Delete + bulk per table; Neon becomes the single source of truth; local <code>web/content/*.json</code> + importers retire; public pages switch to error states (no fallback); scheduled task moves to a cloud cron. <b>daily_logs pilot first</b>, then the other 3 tables.</td><td>🚧 In progress</td></tr>
+        <tr><td class="v">v0.6.0</td><td>P2 · S4 — CRUD write API (cloud-only data): secret-gated Create/Update/Delete + bulk per table; Neon becomes the single source of truth; local <code>web/content/*.json</code> + importers retire; public pages switch to error states (no fallback); scheduled task moves to a cloud cron. <b>CRUD + bulk for all 4 tables now live</b> (daily_logs proven on Neon, then replicated); remaining: retire local sources, switch pages to error states, cloud cron.</td><td>🚧 In progress</td></tr>
         <tr><td class="v">v0.6.x+</td><td>Phase 2 rest — S5 retire local sources end-to-end (skills write the API directly; Obsidian + jd-based-resume files retire) · cloud scheduled sync</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
