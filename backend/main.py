@@ -12,7 +12,7 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from db import Base, SessionLocal, engine
 from models import Application, DailyLog, LeetcodeProblem, SDDeck
@@ -34,12 +34,15 @@ def require_admin(x_admin_secret: Optional[str] = Header(default=None)) -> None:
 
 # ---- Write schemas (P2·S4 CRUD). Pydantic validates the body → 422 on bad shape.
 class DailyLogIn(BaseModel):
-    """Full body for creating/replacing one day (the `date` is the URL path)."""
+    """Full body for creating/replacing one day (the `date` is the URL path).
+    `sections` is the full faithful vault record ({heading -> content}) — PRIVATE,
+    served only on /full; the public endpoint never returns it."""
     week: Optional[str] = None
     done: list[str] = Field(default_factory=list)
     summary: Optional[str] = None
     note: Optional[str] = None
     leetcode: list[dict] = Field(default_factory=list)
+    sections: Optional[dict] = None
 
 
 class DailyLogPatch(BaseModel):
@@ -49,6 +52,7 @@ class DailyLogPatch(BaseModel):
     summary: Optional[str] = None
     note: Optional[str] = None
     leetcode: Optional[list[dict]] = None
+    sections: Optional[dict] = None
 
 
 class DailyLogFull(DailyLogIn):
@@ -61,6 +65,14 @@ async def lifespan(_app: FastAPI):
     # Ensure the table exists so /summary never errors before the first import.
     if engine is not None:
         Base.metadata.create_all(engine)
+        # Lightweight migration: create_all never ALTERs an existing table, so add
+        # the daily_logs.sections column if it's missing. Idempotent; best-effort
+        # (a fresh SQLite table already has it, so the ALTER is skipped/ignored).
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS sections JSON"))
+        except Exception:
+            pass
     yield
 
 
@@ -188,10 +200,11 @@ def system_design():
     return {"decks": decks}
 
 
-def _daily_log_entries():
-    """Daily-log entries newest-first, LeetCode items enriched with their
-    solution URL from the leetcode table (single source). Shared by the public
-    and the private (authenticated) endpoints."""
+def _daily_log_entries(include_sections: bool = False):
+    """Daily-log entries newest-first, LeetCode items enriched with their solution
+    URL from the leetcode table (single source). `include_sections` adds the full
+    private `sections` — ONLY ever True for the gated /full endpoint; the public
+    endpoint must never pass it, so private sections can't leak."""
     if SessionLocal is None:
         return []
     with SessionLocal() as session:
@@ -202,8 +215,9 @@ def _daily_log_entries():
             ).all()
         }
         rows = session.execute(select(DailyLog).order_by(DailyLog.date.desc())).scalars().all()
-        return [
-            {
+        out = []
+        for r in rows:
+            entry = {
                 "date": r.date,
                 "week": r.week,
                 "done": r.done or [],
@@ -213,22 +227,25 @@ def _daily_log_entries():
                     {**item, "solutionUrl": sol.get(item.get("id"))} for item in (r.leetcode or [])
                 ],
             }
-            for r in rows
-        ]
+            if include_sections:
+                entry["sections"] = r.sections or {}
+            out.append(entry)
+        return out
 
 
 @app.get("/api/daily-log")
 def daily_log():
-    """Public — the curated daily-log entries (checked items + one-line summary)."""
+    """Public — curated fields only (checked items + one-line summary + LeetCode).
+    Never returns `sections`, so the private per-day content can't leak."""
     return _daily_log_entries()
 
 
 @app.get("/api/daily-log/full", dependencies=[Depends(require_admin)])
 def daily_log_full():
-    """PRIVATE — the daily log through the authenticated channel. Same curated
-    fields today; the full private per-day sections will land here (behind the
-    shared secret) once wired. Gated by X-Admin-Secret (fail-closed)."""
-    return {"entries": _daily_log_entries()}
+    """PRIVATE — the full daily log through the authenticated channel, INCLUDING
+    the private `sections` (Success Diary / interview / advisor / companies).
+    Gated by X-Admin-Secret (fail-closed)."""
+    return {"entries": _daily_log_entries(include_sections=True)}
 
 
 # ---------------------------------------------------------------------------
@@ -241,8 +258,8 @@ def daily_log_full():
 
 
 def _serialize_daily(row: DailyLog) -> dict:
-    """The stored row as-is (round-trips with PUT); reads that enrich LeetCode
-    solution links stay in _daily_log_entries()."""
+    """The stored row as-is, INCLUDING sections (this serializer backs the gated
+    write/read endpoints only — never the public one). Round-trips with PUT."""
     return {
         "date": row.date,
         "week": row.week,
@@ -250,6 +267,7 @@ def _serialize_daily(row: DailyLog) -> dict:
         "summary": row.summary,
         "note": row.note,
         "leetcode": row.leetcode or [],
+        "sections": row.sections or {},
     }
 
 
@@ -259,6 +277,7 @@ def _apply_full(row: DailyLog, body: DailyLogIn) -> None:
     row.summary = body.summary
     row.note = body.note
     row.leetcode = body.leetcode
+    row.sections = body.sections
 
 
 @app.get("/api/daily-log/{date}", dependencies=[Depends(require_admin)])

@@ -58,7 +58,11 @@ class DailyLog(Base):
 
     date = Column(String(10), primary_key=True)  # "YYYY-MM-DD"
     week = Column(String(8))  # ISO week label, e.g. "W34"
-    done = Column(JSON)  # list[str]
-    summary = Column(Text)
+    done = Column(JSON)  # list[str] — curated, public
+    summary = Column(Text)  # one-line, public (generated during integration)
     note = Column(Text)
     leetcode = Column(JSON)  # list[{id, slug, title}]
+    # Full faithful record from the Obsidian vault: {heading -> content}. Holds
+    # the private sections too (Success Diary / interview / advisor / companies).
+    # PRIVATE — served only on the gated /full endpoint, never on the public one.
+    sections = Column(JSON)
