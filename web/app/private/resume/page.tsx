@@ -94,7 +94,7 @@ export default async function PrivateResumePage() {
                   <span className="font-semibold">{r.company ?? r.slug}</span>
                   {r.role ? <span className="text-neutral-500"> · {r.role}</span> : null}
                   <span className="ml-2 font-mono text-xs text-neutral-400">
-                    {r.appNum != null ? `app #${r.appNum}` : ""}
+                    résumé {r.slug}
                     {r.date ? ` · ${r.date}` : ""}
                   </span>
                 </summary>

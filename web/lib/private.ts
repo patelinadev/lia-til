@@ -77,9 +77,8 @@ export async function getIndex(): Promise<SiteIndex | null> {
 }
 
 export type ResumeRow = {
-  slug: string;
+  slug: string; // "base" | the Resume # (outputs/NNN). Linked from applications.resume.
   kind: string; // "base" | "tailored"
-  appNum: number | null;
   company: string | null;
   role: string | null;
   date: string | null;

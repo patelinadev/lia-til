@@ -883,17 +883,17 @@ def system_design_bulk(entries: list[SDDeckFull]):
 # ===========================================================================
 # Résumés (P2·S6). PK = slug. TWO privacy tiers:
 #   • kind='base'     — the single public master résumé (public /resume page).
-#   • kind='tailored' — per-JD résumés, one per application (linked by appNum),
+#   • kind='tailored' — per-JD résumés, keyed by Resume # (the outputs/NNN). One
+#                       résumé is reused across MANY applications, so it has NO
+#                       app_num — the link is applications.resume → this slug.
 #                       PRIVATE (company names) — only on the gated /full route.
 # `GET /api/resume` (public) returns ONLY the base row, so tailored résumés can
 # never leak. Bodies are text (markdown/tex); no PDF/binary here (object storage
-# deferred). Write bodies use the same camelCase (appNum) the reads return.
-# /full is declared before /{slug} so it wins the route match.
+# deferred). /full is declared before /{slug} so it wins the route match.
 # ===========================================================================
 class ResumeBody(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     kind: Optional[str] = None
-    app_num: Optional[int] = Field(default=None, alias="appNum")
     company: Optional[str] = None
     role: Optional[str] = None
     date: Optional[str] = None
@@ -913,7 +913,6 @@ def _serialize_resume(r: Resume) -> dict:
     return {
         "slug": r.slug,
         "kind": r.kind,
-        "appNum": r.app_num,
         "company": r.company,
         "role": r.role,
         "date": r.date,
@@ -924,7 +923,6 @@ def _serialize_resume(r: Resume) -> dict:
 
 def _apply_resume(row: Resume, body) -> None:
     row.kind = body.kind
-    row.app_num = body.app_num
     row.company = body.company
     row.role = body.role
     row.date = body.date
