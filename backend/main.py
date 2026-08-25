@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text
 
 from db import Base, SessionLocal, engine
-from models import Application, DailyLog, LeetcodeProblem, Resume, SDDeck, SiteMeta
+from models import Application, DailyLog, LeetcodeProblem, Resume, SDDeck, SiteMeta, StudyNote
 
 LEETCODE_TRACK = "0x3f Basic Algorithms"
 LEETCODE_TRACK_URL = "https://space.bilibili.com/206214/channel/collectiondetail?sid=842776"
@@ -1030,5 +1030,135 @@ def resume_bulk(entries: list[ResumeFull]):
                 row = Resume(slug=entry.slug)
                 session.add(row)
             _apply_resume(row, entry)
+        session.commit()
+        return {"upserted": len(entries)}
+
+
+# ===========================================================================
+# Study notes (P2·S5). PK = slug. Standalone, text-first notes (markdown / HTML
+# / mermaid / inline SVG in `body`). PUBLIC educational content like SD decks:
+# GET list is public; writes are X-Admin-Secret-gated. `tags` auto-nothing here
+# (manual only). /bulk replaces the migration importer.
+# ===========================================================================
+class StudyNoteBody(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    title: Optional[str] = None
+    topic: Optional[str] = None
+    date: Optional[str] = None
+    body: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class StudyNotePatch(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    title: Optional[str] = None
+    topic: Optional[str] = None
+    date: Optional[str] = None
+    body: Optional[str] = None
+    tags: Optional[list[str]] = None
+
+
+class StudyNoteFull(StudyNoteBody):
+    slug: str
+
+
+def _serialize_study_note(r: StudyNote) -> dict:
+    return {
+        "slug": r.slug,
+        "title": r.title,
+        "topic": r.topic,
+        "date": r.date,
+        "body": r.body,
+        "tags": r.tags or [],
+    }
+
+
+def _apply_study_note(row: StudyNote, body) -> None:
+    row.title = body.title
+    row.topic = body.topic
+    row.date = body.date
+    row.body = body.body
+    row.tags = body.tags
+
+
+@app.get("/api/study-notes")
+def study_notes():
+    """PUBLIC — all study notes, newest first (by date, then slug)."""
+    if SessionLocal is None:
+        return {"notes": []}
+    with SessionLocal() as session:
+        rows = session.execute(select(StudyNote)).scalars().all()
+        rows = sorted(rows, key=lambda r: (r.date or "", r.slug), reverse=True)
+        return {"notes": [_serialize_study_note(r) for r in rows]}
+
+
+@app.get("/api/study-notes/{slug}")
+def study_note_get(slug: str):
+    """PUBLIC — one study note."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(StudyNote, slug)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        return _serialize_study_note(row)
+
+
+@app.put("/api/study-notes/{slug}", dependencies=[Depends(require_admin)])
+def study_note_put(slug: str, body: StudyNoteBody):
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(StudyNote, slug)
+        created = row is None
+        if created:
+            row = StudyNote(slug=slug)
+            session.add(row)
+        _apply_study_note(row, body)
+        session.commit()
+        session.refresh(row)
+        return {"created": created, **_serialize_study_note(row)}
+
+
+@app.patch("/api/study-notes/{slug}", dependencies=[Depends(require_admin)])
+def study_note_patch(slug: str, body: StudyNotePatch):
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(StudyNote, slug)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        for key, value in body.model_dump(exclude_unset=True).items():
+            setattr(row, key, value)
+        session.commit()
+        session.refresh(row)
+        return _serialize_study_note(row)
+
+
+@app.delete("/api/study-notes/{slug}", dependencies=[Depends(require_admin)])
+def study_note_delete(slug: str):
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(StudyNote, slug)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        session.delete(row)
+        session.commit()
+        return {"deleted": slug}
+
+
+@app.post("/api/study-notes/bulk", dependencies=[Depends(require_admin)])
+def study_notes_bulk(entries: list[StudyNoteFull]):
+    """PRIVATE — upsert an array (replaces the migration importer)."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        for entry in entries:
+            row = session.get(StudyNote, entry.slug)
+            if row is None:
+                row = StudyNote(slug=entry.slug)
+                session.add(row)
+            _apply_study_note(row, entry)
         session.commit()
         return {"upserted": len(entries)}
