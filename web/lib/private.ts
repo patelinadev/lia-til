@@ -35,6 +35,9 @@ export type FullDailyLogEntry = {
   summary: string | null;
   note: string | null;
   leetcode: { id: number; slug?: string; title?: string; solutionUrl?: string | null }[];
+  /** The full faithful record from the vault ({heading -> content}), including
+   * the private sections. Served ONLY by the gated /full endpoint. */
+  sections?: Record<string, string> | null;
 };
 
 /** Fetch the full daily log from the backend's private endpoint (secret-gated).
