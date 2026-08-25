@@ -263,6 +263,7 @@
     <a href="#p2s1"><span class="st">P2·S1</span> Backend + Apps <span class="dot dot--go"></span></a>
     <a href="#p2s2"><span class="st">P2·S2</span> Instant sync <span class="dot dot--go"></span></a>
     <a href="#p2s3"><span class="st">P2·S3</span> GitHub login <span class="dot dot--go"></span></a>
+    <a href="#p2s4"><span class="st">P2·S4</span> CRUD API <span class="dot dot--you"></span></a>
   </div>
 
   <div class="legend">
@@ -949,6 +950,76 @@ Instance Type   = Free</pre>
 
   </section>
 
+  <!-- ============================ P2 · S4 ============================ -->
+  <section class="stage" id="p2s4">
+    <div class="stage__head">
+      <span class="badge">P2 · S4</span>
+      <h2>CRUD write API — cloud-only data</h2>
+      <span class="status status--wip">🚧 In progress</span>
+      <span class="stage__ver">v0.6.0 (target)</span>
+    </div>
+    <p class="goal">End goal: <b>get rid of local files.</b> Today the source of truth is local JSON (<code>web/content/*</code> + the private ledger); Claude edits them and a local <code>import_*.py</code> reloads the DB. This stage flips it — <b>Neon becomes the single source of truth</b>, edited through a <b>secret-gated CRUD API</b> in the cloud. After it, every create / update / delete is one HTTP call: no local files, no importer, no laptop in the loop.</p>
+
+    <div class="callout me"><span class="k">Why NOT migrate the DB</span><span>The trigger was "I want to edit data via API, not from local." That does <b>not</b> need a different database — Neon is already cloud and already the serving source. What changes is the <b>write path</b>: from "local file → importer → DB" to "<b>API → DB</b>". Neon stays; we add the write layer on top of the 4 tables.</span></div>
+
+    <div class="callout"><span class="k">Decision — no fallback</span><span>The public pages currently fall back to the committed <code>web/content/*.json</code> when the API is down (the "129 snapshot"). Once the DB is source of truth, that fallback <b>goes away</b>: on a backend error the page shows an honest <b>error state</b>, not stale numbers. The JSON files + importers are then <b>deleted</b>.</span></div>
+
+    <div class="callout me"><span class="k">Auth + validation reuse</span><span>Writes reuse the existing <code>require_admin</code> dependency (<code>X-Admin-Secret</code>, <b>fail-closed</b>) — the same gate the private read endpoints use, no new auth. Request bodies are validated by <b>Pydantic</b> schemas (wrong shape → 422, never a dirty row).</span></div>
+
+    <div class="phase"><span class="phase__k">§</span><h3>The CRUD surface (all 4 tables)</h3></div>
+    <p class="phase__note">Reads (R) mostly exist already; this stage adds Create / Update / Delete + a bulk seed per table. Every write is <code>X-Admin-Secret</code>-gated.</p>
+    <div class="tablewrap">
+      <table class="demo">
+        <thead><tr><th>Table (PK)</th><th>Create / Upsert</th><th>Read</th><th>Update</th><th>Delete</th><th>Bulk</th></tr></thead>
+        <tbody>
+          <tr><td>daily_logs (date)</td><td>PUT /{date}</td><td>GET /full ✅ · /{date}</td><td>PATCH /{date}</td><td>DELETE /{date}</td><td>POST /bulk</td></tr>
+          <tr><td>applications (app_num)</td><td>POST</td><td>GET /full ✅ · /{n}</td><td>PATCH /{n}</td><td>DELETE /{n}</td><td>POST /bulk</td></tr>
+          <tr><td>leetcode_problems (id)</td><td>POST</td><td>GET ✅ · /{id}</td><td>PATCH /{id}</td><td>DELETE /{id}</td><td>POST /bulk</td></tr>
+          <tr><td>sd_decks (slug)</td><td>POST</td><td>GET ✅ · /{slug}</td><td>PATCH /{slug}</td><td>DELETE /{slug}</td><td>POST /bulk</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="phase"><span class="phase__k">A</span><h3>Pilot — daily_logs (this step)</h3></div>
+    <p class="phase__note">Build the pattern once on daily_logs, prove it end-to-end, then replicate to the other 3 tables.</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Schemas</span><div>Pydantic <code>DailyLogIn</code> (full body: <code>week</code> / <code>done[]</code> / <code>summary</code> / <code>note</code> / <code>leetcode[]</code>) + <code>DailyLogPatch</code> (all fields optional; served with <code>exclude_unset</code> so PATCH touches only what you send).</div></div>
+      <div class="rb__row"><span class="rb__n">Upsert</span><div><code>PUT /api/daily-log/{date}</code> — create-or-replace that whole day (matches the "write today's log" habit). Gated.</div></div>
+      <div class="rb__row"><span class="rb__n">Patch</span><div><code>PATCH /api/daily-log/{date}</code> — change just a field (append a note, fix a summary) without resending the day; 404 if the day doesn't exist. Gated.</div></div>
+      <div class="rb__row"><span class="rb__n">Delete / read-one</span><div><code>DELETE /api/daily-log/{date}</code> and <code>GET /api/daily-log/{date}</code> (private, full row). Gated.</div></div>
+      <div class="rb__row"><span class="rb__n">Bulk</span><div><code>POST /api/daily-log/bulk</code> — upsert a whole array in one call. This <b>replaces <code>import_daily_log.py</code></b>: the seed / reload now runs through the cloud, so the local script can retire.</div></div>
+      <div class="rb__row"><span class="rb__n">Reuse</span><div>Reads still go through <code>_daily_log_entries()</code> (LeetCode links enriched by id). Writes touch only the <code>daily_logs</code> table.</div></div>
+    </div>
+
+    <div class="phase"><span class="phase__k">B</span><h3>Verify (curl, with your secret)</h3></div>
+    <div class="card">
+      <pre class="cmd">S=$BACKEND_SECRET; B=https://lia-til.onrender.com
+<span class="c"># create / replace a day</span>
+curl -X PUT $B/api/daily-log/2026-08-21 -H "x-admin-secret: $S" -H "content-type: application/json" \
+  -d '{"week":"W34","done":["Built the CRUD API"],"summary":"cloud-only writes"}'
+<span class="c"># patch just the note</span>
+curl -X PATCH $B/api/daily-log/2026-08-21 -H "x-admin-secret: $S" -H "content-type: application/json" \
+  -d '{"note":"pilot works"}'
+<span class="c"># read it back, then delete</span>
+curl $B/api/daily-log/2026-08-21 -H "x-admin-secret: $S"
+curl -X DELETE $B/api/daily-log/2026-08-21 -H "x-admin-secret: $S"
+<span class="c"># no secret → 401 (fail-closed)</span>
+curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
+      <p>Each write is live immediately on <code>/private/daily-log</code> — no rebuild, no local step.</p>
+    </div>
+
+    <div class="phase"><span class="phase__k">→</span><h3>After the pilot</h3></div>
+    <p class="phase__note">Once daily_logs is proven, the rest of S4/S5:</p>
+    <div class="card">
+      <ul>
+        <li><b>Replicate</b> the CRUD + bulk pattern to applications, leetcode_problems, sd_decks.</li>
+        <li><b>Retire local sources</b>: seed each table via its bulk endpoint, then delete <code>web/content/*.json</code>, the ledger dependency, and every <code>import_*.py</code>.</li>
+        <li><b>Frontend</b>: replace each fallback with an <b>error state</b> (no snapshot).</li>
+        <li><b>Cloud cron</b> (Render Cron Job) for scheduled / automated updates — replaces the local scheduled task. Zero local, zero laptop.</li>
+      </ul>
+    </div>
+  </section>
+
   <!-- ============================ VERSION HISTORY ============================ -->
   <div class="phase" style="margin-top:44px"><span class="phase__k">§</span><h3>Version History</h3></div>
   <div class="vhist">
@@ -964,7 +1035,8 @@ Instance Type   = Free</pre>
         <tr><td class="v">v0.5.1</td><td>P2 · S3+ — private area buildout: <code>/private</code> hub + <code>/private/daily-log</code> (private channel) + a signed-in-only site-wide nav to hop between public &amp; private</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.2</td><td>P2 · S3+ — private view read-UX: Applications ledger gets fuzzy search + Role-column filter + status filter + live stats bar; private Daily Log gets a compact left-edge jump rail (week dropdown + year→month→day calendar picker) + LeetCode solution links (resolved by id from <code>leetcode.json</code>, same as public)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.3</td><td>P2 · S3+ — backend cold-start resilience: retry-until-awake fetch (<code>lib/net.ts</code>) + <code>maxDuration=60</code> so cold loads wait for live data instead of dropping to the stale snapshot/empty; null-vs-empty private states; refreshed <code>applications.json</code> fallback; removed the stale public "Updated" line. Keep-warm <code>/health</code> ping = manual (runbook in P2·S3).</td><td>🚧 Code live · ping pending</td></tr>
-        <tr><td class="v">v0.5.x+</td><td>Phase 2 rest — S4 admin editor (Markdown live-preview) · S5 retire local sources / scheduled sync</td><td>🗺️ Planned</td></tr>
+        <tr><td class="v">v0.6.0</td><td>P2 · S4 — CRUD write API (cloud-only data): secret-gated Create/Update/Delete + bulk per table; Neon becomes the single source of truth; local <code>web/content/*.json</code> + importers retire; public pages switch to error states (no fallback); scheduled task moves to a cloud cron. <b>daily_logs pilot first</b>, then the other 3 tables.</td><td>🚧 In progress</td></tr>
+        <tr><td class="v">v0.6.x+</td><td>Phase 2 rest — S5 retire local sources end-to-end (skills write the API directly; Obsidian + jd-based-resume files retire) · cloud scheduled sync</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
   </div>
