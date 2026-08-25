@@ -68,3 +68,15 @@ class DailyLog(Base):
     sections = Column(JSON)
     # Topic / type labels for categorization + search, e.g. ["code", "system-design"].
     tags = Column(JSON)  # list[str]
+
+
+class SiteMeta(Base):
+    """Small key-value store for singleton documents that aren't per-day. Currently
+    holds the private INDEX / TL;DR navigator (key='index'); `value` is markdown.
+    PRIVATE — served only behind the admin secret, never on any public endpoint."""
+
+    __tablename__ = "site_meta"
+
+    key = Column(String(64), primary_key=True)
+    value = Column(Text)  # markdown
+    updated_at = Column(String(10))  # "YYYY-MM-DD", set server-side on write

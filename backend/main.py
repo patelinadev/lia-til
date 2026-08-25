@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text
 
 from db import Base, SessionLocal, engine
-from models import Application, DailyLog, LeetcodeProblem, SDDeck
+from models import Application, DailyLog, LeetcodeProblem, SDDeck, SiteMeta
 
 LEETCODE_TRACK = "0x3f Basic Algorithms"
 LEETCODE_TRACK_URL = "https://space.bilibili.com/206214/channel/collectiondetail?sid=842776"
@@ -449,6 +449,49 @@ def daily_log_bulk(entries: list[DailyLogFull]):
             _apply_full(row, entry)
         session.commit()
         return {"upserted": len(entries)}
+
+
+# ===========================================================================
+# INDEX / TL;DR navigator (P2·S5). A single private markdown document — the
+# rolling "table of contents" for fast recall. Stored in site_meta under
+# key='index'. PRIVATE — both read and write are X-Admin-Secret-gated; it is
+# never exposed on any public endpoint.
+# ===========================================================================
+INDEX_KEY = "index"
+
+
+class IndexBody(BaseModel):
+    value: str  # markdown
+
+
+@app.get("/api/index", dependencies=[Depends(require_admin)])
+def index_get():
+    """PRIVATE — the INDEX/TL;DR markdown (empty string if never written)."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(SiteMeta, INDEX_KEY)
+        if row is None:
+            return {"value": "", "updatedAt": None}
+        return {"value": row.value or "", "updatedAt": row.updated_at}
+
+
+@app.put("/api/index", dependencies=[Depends(require_admin)])
+def index_put(body: IndexBody):
+    """PRIVATE — replace the whole INDEX/TL;DR document (upsert). Stamps today."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    today = date_type.today().isoformat()
+    with SessionLocal() as session:
+        row = session.get(SiteMeta, INDEX_KEY)
+        created = row is None
+        if created:
+            row = SiteMeta(key=INDEX_KEY)
+            session.add(row)
+        row.value = body.value
+        row.updated_at = today
+        session.commit()
+        return {"created": created, "value": row.value, "updatedAt": row.updated_at}
 
 
 # ===========================================================================
