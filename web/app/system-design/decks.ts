@@ -76,12 +76,9 @@ export const PHASES: { key: string; label: string; decks: [number, string][] }[]
   },
 ];
 
-// Deck CONTENT is the single source at web/content/system-design.json (also read
-// by the backend importer backend/import_system_design.py). This static import is
-// only the offline fallback — at request time the pages fetch /api/system-design.
-import sdData from "@/content/system-design.json";
-
-export const DECKS: Deck[] = sdData.decks as Deck[];
+// Deck CONTENT lives in the DB (table sd_decks) and is fetched at request time
+// via /api/system-design (see ./data.ts). The 30-deck PHASES curriculum above is
+// static structure; the helpers below operate on whatever deck set the page fetched.
 
 /** slug -> last-reviewed date, for whichever deck set the page is rendering. */
 export function reviewedMap(decks: Deck[]): Record<number, string> {

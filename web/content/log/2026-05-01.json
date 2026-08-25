@@ -1,7 +1,0 @@
-{
-  "date": "2026-05-01",
-  "week": "W18",
-  "done": [],
-  "summary": null,
-  "note": "Hash Table: any traversal is O(n); why Hash Map is O(1) (the hash function computes the index directly) and how collisions degrade it to O(n)"
-}
