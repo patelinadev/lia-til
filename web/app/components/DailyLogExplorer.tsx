@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { realSections, filterEntries, filterToQuery, parseFilter } from "@/lib/daily";
 import TagChips from "@/app/components/TagChips";
-import SectionBody from "@/app/components/SectionBody";
 
 export type DailyEntry = {
   date: string;
@@ -343,20 +342,6 @@ function PublicDayCard({ e }: { e: DailyEntry }) {
         </div>
       )}
       {e.note && <p className="mt-3 border-l-2 border-neutral-200 pl-3 text-sm text-neutral-500 dark:border-neutral-700">📝 {e.note}</p>}
-      {realSections(e.sections).length > 0 && (
-        <div className="mt-3 flex flex-col gap-2">
-          {realSections(e.sections).map(([heading, content]) => (
-            <details key={heading} className="rounded-lg border border-neutral-200 dark:border-neutral-800">
-              <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                {heading}
-              </summary>
-              <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-800">
-                <SectionBody md={content} />
-              </div>
-            </details>
-          ))}
-        </div>
-      )}
     </article>
   );
 }

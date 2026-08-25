@@ -288,45 +288,11 @@ def _tags_for(row: DailyLog) -> list[str]:
     return sorted(set((row.tags or []) + _auto_tags(row.sections)))
 
 
-# Section policy. Headings are matched with any trailing "#tag" stripped (the
-# vault stored both "Tech" and "Tech  #tech"). PRIVATE headings never appear on
-# the public endpoint; everything else is public-safe learning content
-# (Tech / Interview / Oral English / Timeline / 今日快报 / one-off tech notes).
-_TAG_SUFFIX = re.compile(r"\s+#[\w-]+\s*$")
-
-
-def _clean_heading(k: str) -> str:
-    return _TAG_SUFFIX.sub("", k).strip()
-
-
-def _is_private_heading(h: str) -> bool:
-    """h must already be cleaned. Private = Success Diary + daily SOP + To-Do."""
-    return (
-        h in ("Success Diary", "_preamble")
-        or h.startswith("今日 SOP")
-        or h.startswith("今日 To-Do")
-        or h.startswith("今日 To-do")
-    )
-
-
-def _sections_out(sections, public: bool) -> dict:
-    """Normalize headings (strip #tag). For the public endpoint, drop the private
-    ones so only public-safe sections are ever serialized outside the secret."""
-    out = {}
-    for k, v in (sections or {}).items():
-        h = _clean_heading(k)
-        if public and _is_private_heading(h):
-            continue
-        out[h] = v
-    return out
-
-
 def _daily_log_entries(include_sections: bool = False):
     """Daily-log entries newest-first, LeetCode items enriched with their solution
-    URL from the leetcode table (single source). `include_sections` (the gated
-    /full endpoint) returns EVERY section; the public endpoint returns only the
-    public-safe sections (private headings filtered out), so Success Diary / SOP /
-    To-Do can't leak."""
+    URL from the leetcode table (single source). `include_sections` adds the full
+    private `sections` — ONLY ever True for the gated /full endpoint; the public
+    endpoint must never pass it, so private sections can't leak."""
     if SessionLocal is None:
         return []
     with SessionLocal() as session:
@@ -351,17 +317,13 @@ def _daily_log_entries(include_sections: bool = False):
                 ],
             }
             if include_sections:
-                # private: every day, with its full sections (headings normalized)
-                entry["sections"] = _sections_out(r.sections, public=False)
+                # private: every day, with its full sections
+                entry["sections"] = r.sections or {}
                 out.append(entry)
-            else:
-                # public: curated fields + public-safe sections. A day surfaces if
-                # it has ANY public content; a day with only private sections
-                # (e.g. pure Success Diary) stays hidden.
-                pub = _sections_out(r.sections, public=True)
-                if r.done or r.summary or r.note or r.leetcode or pub:
-                    entry["sections"] = pub
-                    out.append(entry)
+            elif r.done or r.summary or r.note or r.leetcode:
+                # public: only days that have curated public content — a day that
+                # holds only private `sections` (not yet curated) stays hidden.
+                out.append(entry)
         return out
 
 
