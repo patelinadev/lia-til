@@ -66,3 +66,5 @@ class DailyLog(Base):
     # the private sections too (Success Diary / interview / advisor / companies).
     # PRIVATE — served only on the gated /full endpoint, never on the public one.
     sections = Column(JSON)
+    # Topic / type labels for categorization + search, e.g. ["code", "system-design"].
+    tags = Column(JSON)  # list[str]
