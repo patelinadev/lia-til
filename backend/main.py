@@ -219,8 +219,31 @@ def _section_has_content(md) -> bool:
     return False
 
 
+def _signal_text(sections: dict) -> str:
+    """Text that reflects what the day ACTUALLY did: completed `- [x]` items from
+    anywhere, plus the prose of substantive (non-SOP-plan) sections. Excludes
+    un-done template todos so a standing task like '出 1 条简历 bullet' doesn't
+    tag every day."""
+    parts = []
+    for k, v in sections.items():
+        if k == "_preamble" or not _section_has_content(v):
+            continue
+        is_plan = "SOP" in k or "To-Do" in k or "To-do" in k or k.strip().startswith("今日")
+        for line in (v or "").split("\n"):
+            lt = line.strip()
+            cb = re.match(r"^[-*]\s*\[([ xX])\]\s*(.*)$", lt)
+            if cb:
+                if cb.group(1).lower() == "x":  # completed only
+                    parts.append(cb.group(2))
+            elif not is_plan:
+                parts.append(lt)
+    return " ".join(parts)
+
+
 def _auto_tags(sections: Optional[dict]) -> list[str]:
-    """Rule-based tier-1 tags derived from a day's content (see the taxonomy)."""
+    """Rule-based tier-1 tags. Section-presence tags come from a section actually
+    having content; content-signal tags read only _signal_text (done work +
+    substantive notes), so un-done template todos don't over-tag."""
     if not sections:
         return []
     tags = set()
@@ -236,22 +259,22 @@ def _auto_tags(sections: Optional[dict]) -> list[str]:
             tags.add("mindset")
         if "```" in (v or ""):
             tags.add("code")
-    content = " ".join(v for k, v in sections.items() if k != "_preamble" and _section_has_content(v))
-    cl = content.lower()
-    if _LC.search(content) or "leetcode" in cl or "0x3f" in cl or any(
-        x in content for x in ("刷题", "滑动窗口", "双指针", "哈希表", "二分", "回溯", "动态规划", "链表", "单调栈")
+    sig = _signal_text(sections)
+    sl = sig.lower()
+    if _LC.search(sig) or "leetcode" in sl or "0x3f" in sl or any(
+        x in sig for x in ("刷题", "滑动窗口", "双指针", "哈希表", "二分", "回溯", "动态规划", "链表", "单调栈")
     ):
         tags.add("leetcode")
-    if "system design" in cl or "系统设计" in content or "dns" in cl or "rate limit" in cl or any(
-        x in content for x in ("负载均衡", "一致性哈希", "限流", "缓存层")
+    if "system design" in sl or "系统设计" in sig or "dns" in sl or "rate limit" in sl or any(
+        x in sig for x in ("负载均衡", "一致性哈希", "限流", "缓存层")
     ):
         tags.add("system-design")
-    if "简历" in content or "resume" in cl or "bullet" in cl:
-        tags.add("resume")
-    if "择导" in content or "advisor" in cl or "faculty" in cl or "导师" in content or re.search(r"\bph\.?d", cl):
-        tags.add("phd-advisor")
-    if "投递" in content or "投简历" in content or "申请" in content or "application" in cl:
-        tags.add("applications")
+    # PhD / grad-school applications (advisor selection, faculty, PhD apps)
+    if "择导" in sig or "advisor" in sl or "faculty" in sl or "导师" in sig or "博士" in sig or re.search(r"\bph\.?d", sl):
+        tags.add("phd-application")
+    # resume + job recruiting (resume bullets, submitting applications)
+    if any(x in sig for x in ("简历", "投递", "投简历")) or "resume" in sl or "bullet" in sl or "recruit" in sl or re.search(r"\bcv\b", sl):
+        tags.add("resume-recruit")
     return sorted(tags)
 
 
