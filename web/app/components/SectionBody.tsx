@@ -1,5 +1,62 @@
 import type { ReactNode } from "react";
 
+// ---- lightweight syntax highlighter (no dependency) --------------------------
+const KEYWORDS = new Set([
+  "def", "return", "for", "while", "if", "elif", "else", "in", "not", "and", "or", "is",
+  "class", "import", "from", "as", "with", "try", "except", "finally", "raise", "lambda",
+  "yield", "pass", "break", "continue", "global", "nonlocal", "del", "assert", "self",
+  "const", "let", "var", "function", "new", "this", "typeof", "instanceof", "export",
+  "default", "extends", "interface", "type", "enum", "implements", "public", "private",
+  "protected", "static", "readonly", "void", "super", "of", "case", "switch", "do", "throw",
+  "catch", "async", "await", "True", "False", "None", "null", "undefined", "true", "false",
+]);
+const SQL = new Set([
+  "select", "from", "where", "join", "left", "right", "inner", "outer", "on", "group", "by",
+  "order", "having", "limit", "offset", "insert", "into", "values", "update", "set", "delete",
+  "create", "table", "drop", "alter", "primary", "key", "foreign", "references", "distinct",
+  "count", "sum", "avg", "min", "max", "like", "between", "union", "index", "as", "and", "or",
+]);
+const isKeyword = (t: string) => KEYWORDS.has(t) || SQL.has(t.toLowerCase());
+
+const TOKEN =
+  /(#[^\n]*|\/\/[^\n]*|\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\b\d[\w.]*)|([A-Za-z_$][\w$]*)|(\s+|[\s\S])/g;
+
+function highlight(code: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let m: RegExpExecArray | null;
+  let k = 0;
+  TOKEN.lastIndex = 0;
+  while ((m = TOKEN.exec(code)) !== null) {
+    const [full, comment, str, num, ident] = m;
+    if (comment) out.push(<span key={k++} className="italic text-neutral-400 dark:text-neutral-500">{comment}</span>);
+    else if (str) out.push(<span key={k++} className="text-emerald-600 dark:text-emerald-400">{str}</span>);
+    else if (num) out.push(<span key={k++} className="text-amber-600 dark:text-amber-500">{num}</span>);
+    else if (ident) {
+      if (isKeyword(ident)) out.push(<span key={k++} className="text-violet-600 dark:text-violet-400">{ident}</span>);
+      else if (code[TOKEN.lastIndex] === "(") out.push(<span key={k++} className="text-blue-600 dark:text-blue-400">{ident}</span>);
+      else out.push(<span key={k++}>{ident}</span>);
+    } else out.push(<span key={k++}>{full}</span>);
+  }
+  return out;
+}
+
+function CodeBlock({ code, lang }: { code: string; lang?: string }) {
+  return (
+    <div className="my-2 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950">
+      {lang && (
+        <div className="border-b border-neutral-200 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-neutral-400 dark:border-neutral-800">
+          {lang}
+        </div>
+      )}
+      <pre className="overflow-x-auto p-3">
+        <code className="font-mono text-[12.5px] leading-relaxed text-neutral-700 dark:text-neutral-300">
+          {highlight(code)}
+        </code>
+      </pre>
+    </div>
+  );
+}
+
 /** Minimal inline markdown: **bold** and `code` (everything else stays literal). */
 function Inline({ text }: { text: string }) {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
@@ -50,17 +107,12 @@ export default function SectionBody({ md }: { md: string }) {
 
     // ---- fenced code block ----
     if (t.startsWith("```")) {
+      const lang = t.slice(3).trim();
       const code: string[] = [];
       i++;
       while (i < lines.length && !lines[i].trim().startsWith("```")) { code.push(lines[i]); i++; }
       i++; // skip the closing fence
-      blocks.push(
-        <pre key={key++} className="my-2 overflow-x-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950">
-          <code className="font-mono text-[12.5px] leading-relaxed text-neutral-700 dark:text-neutral-300">
-            {code.join("\n")}
-          </code>
-        </pre>,
-      );
+      blocks.push(<CodeBlock key={key++} code={code.join("\n")} lang={lang} />);
       continue;
     }
 
