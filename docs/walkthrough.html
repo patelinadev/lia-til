@@ -265,7 +265,7 @@
     <a href="#p2s3"><span class="st">P2·S3</span> GitHub login <span class="dot dot--go"></span></a>
     <a href="#p2s4"><span class="st">P2·S4</span> CRUD API <span class="dot dot--go"></span></a>
     <a href="#p2s5"><span class="st">P2·S5</span> Cloud daily log <span class="dot dot--you"></span></a>
-    <a href="#p2s6"><span class="st">P2·S6</span> Résumé + sync <span class="dot dot--you"></span></a>
+    <a href="#p2s6"><span class="st">P2·S6</span> Résumé + sync <span class="dot dot--go"></span></a>
   </div>
 
   <div class="legend">
@@ -551,7 +551,7 @@ git push origin v0.2.0</pre>
           <tr><td class="v">S3</td><td>GitHub login + private full views (custom OAuth + jose session)</td><td>✅ Done (v0.5.x)</td></tr>
           <tr><td class="v">S4</td><td>CRUD write API — cloud-only data (all 4 tables; local sources retired)</td><td>✅ Done (v0.6.0)</td></tr>
           <tr><td class="v">S5</td><td>Cloud-only daily log (full record + tags + rich UI); skills write the API / retire Obsidian (<b>skills cutover ✅ v0.7.1</b>; study_notes + cron remain)</td><td>🚧 In progress (v0.7.x)</td></tr>
-          <tr><td class="v">S6</td><td>Résumé integration — resumes table + gated CRUD; public /resume + private archive (display deferred); <code>jd-based-resume</code> publishes applications + résumés straight to the API</td><td>🚧 Backend live · display deferred (v0.8.0)</td></tr>
+          <tr><td class="v">S6</td><td>Résumé integration — resumes table + gated CRUD; public /resume + private archive built; <code>jd-based-resume</code> publishes applications + résumés straight to the API</td><td>✅ Built · display deferred by choice (v0.8.0)</td></tr>
         </tbody>
       </table>
     </div>
@@ -1069,9 +1069,9 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
     <div class="card">
       <ul>
         <li><b>Skills write the API ✅ DONE</b> (v0.7.1): learning-log + daily-planner rewritten to read/write the daily log via the CRUD API — <b>skip Obsidian</b>, no daily <code>.md</code> file. Dropped Search / Weekly / Flashcards / Inbox; renamed the 快报 section → <code>Quick Glance</code>; all sections private, public = one-line <code>summary</code> (+ leetcode chips). Stale <code>~/.claude/commands/daily-planner</code> copy retired.</li>
-        <li><b>INDEX write path</b>: the 📖 navigator's writer via <b>skill auto-regen</b> is now in place — learning-log's Refresh INDEX rebuilds the TL;DR from the DB and <code>PUT</code>s <code>/api/index</code>. Still open: an <b>in-page</b> private editor (nice-to-have).</li>
-        <li><b>English summaries</b>: the migrated days have no one-line <code>summary</code> yet (the vault has none) — curate them so those days surface on the public timeline.</li>
-        <li><b>Study notes</b>: a separate <code>study_notes</code> table (text-first body — SVG/HTML/mermaid inline; object storage only if screenshots pile up).</li>
+        <li><b>INDEX write path ✅ DONE</b> (skill auto-regen): learning-log's Refresh INDEX rebuilds the TL;DR from the DB and <code>PUT</code>s <code>/api/index</code>. (An <b>in-page</b> private editor is deferred to a later stage — not part of S5.)</li>
+        <li><b>English summaries</b> (in progress): the migrated days have no one-line <code>summary</code> yet — curate publishable one-liners for the days with real content so they surface on the public timeline (most migrated days are thin SOP/Timeline-only and stay private).</li>
+        <li><b>Study notes ✅ table + API DONE</b>: <code>study_notes</code> table (slug/title/topic/date/body/tags; text-first — markdown/HTML/mermaid/inline SVG, no binary) + public <code>GET /api/study-notes</code> + gated CRUD/bulk. <b>Remaining:</b> migrate past notes into it + a display page.</li>
         <li><b>Cloud cron</b> (Render Cron Job) for scheduled / automated updates — zero local, zero laptop.</li>
       </ul>
     </div>
@@ -1082,7 +1082,7 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
     <div class="stage__head">
       <span class="badge">P2 · S6</span>
       <h2>Résumé integration + cross-repo publish</h2>
-      <span class="status status--wip">🚧 Backend live · display deferred</span>
+      <span class="status status--done">✅ Built · display deferred by choice</span>
       <span class="stage__ver">v0.8.0</span>
     </div>
     <p class="goal">Bring résumés into the same cloud model as everything else, and wire the
@@ -1168,8 +1168,8 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
         <tr><td class="v">v0.6.0</td><td>P2 · S4 — CRUD write API (cloud-only data): secret-gated Create/Update/Delete + bulk per table (all 4 tables); Neon becomes the single source of truth; local <code>web/content/*</code> + importers deleted; public pages switch to error states (no fallback)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.7.0</td><td>P2 · S5 — cloud-only daily log: full vault record stored in a <code>sections</code> column (store-everything, filter-on-read; 38 days migrated via the API); rule-based tags (served public+private); unified public/private explorer (fuzzy + calendar/week/tri-state-tag filters, filter persisted in the URL); per-day pages with checkbox/table/code-highlight rendering + ↑/↓ pager; the <code>~/.til-env</code> secret write-flow (skills → API); a private <code>📖 INDEX/TL;DR</code> navigator (<code>site_meta</code> kv + gated <code>/api/index</code>) shown as a first-visit book drawer</td><td>🚧 In progress</td></tr>
         <tr><td class="v">v0.7.1</td><td>P2 · S5 — <b>skills write the API (skip Obsidian)</b>: learning-log + daily-planner rewritten to read/write the daily log via the CRUD API instead of the vault (no daily <code>.md</code> file). Dropped Search / Weekly / Flashcards / Inbox; renamed the 快报 section → <code>Quick Glance</code>; all sections private, public = one-line <code>summary</code> (+ leetcode chips); INDEX refresh = skill auto-regen (<code>PUT /api/index</code>). Stale <code>~/.claude/commands/daily-planner</code> copy retired.</td><td>✅ Done</td></tr>
-        <tr><td class="v">v0.8.0</td><td>P2 · S6 — <b>résumé integration</b>: <code>resumes</code> table + gated CRUD (public <code>/api/resume</code> = base only; <code>/full</code> + CRUD + bulk gated); public <code>/resume</code> + private archive pages built, then <b>display deferred</b> (no <code>base_resume.md</code> yet). Cross-repo publish spec handed to <code>jd-based-resume</code> (it writes applications + résumés straight to the API; <b>App# ≠ Resume#</b>, one résumé reused across many apps, link via <code>applications.resume</code> → <code>résumé.slug</code>).</td><td>🚧 Backend live · display deferred</td></tr>
-        <tr><td class="v">next</td><td>Planned — applications catch-up (DB 129 → ledger ~154, via the jd-based-resume sync) · résumé display once a <code>base_resume.md</code> exists · <code>study_notes</code> table · in-page INDEX editor · English summaries for migrated days · cloud scheduled sync (Render Cron)</td><td>🗺️ Planned</td></tr>
+        <tr><td class="v">v0.8.0</td><td>P2 · S6 — <b>résumé integration</b>: <code>resumes</code> table + gated CRUD (public <code>/api/resume</code> = base only; <code>/full</code> + CRUD + bulk gated); public <code>/resume</code> + private archive pages built, then <b>display deferred</b> (no <code>base_resume.md</code> yet). Cross-repo publish spec handed to <code>jd-based-resume</code> (it writes applications + résumés straight to the API; <b>App# ≠ Resume#</b>, one résumé reused across many apps, link via <code>applications.resume</code> → <code>résumé.slug</code>). Résumé display is deferred by choice (skipped for now); the backend + pages are complete.</td><td>✅ Built · display deferred</td></tr>
+        <tr><td class="v">next</td><td>Planned — applications catch-up (DB 129 → ledger ~154, via the jd-based-resume sync) · CoWork scheduled task → API (spec handed off) · résumé display once a <code>base_resume.md</code> exists · <code>study_notes</code> content migration + display page · in-page INDEX editor · English summaries for content-rich migrated days · cloud scheduled sync (Render Cron)</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
   </div>

@@ -49,6 +49,22 @@ class SDDeck(Base):
     slides = Column(JSON)  # list[Slide]
 
 
+class StudyNote(Base):
+    """A standalone study note — text-first (markdown / HTML / mermaid / SVG stored
+    inline in `body`); no binary/`pic` column, no object storage (a rare screenshot
+    goes in as a base64 data-URI). Separate from daily_logs (whose `note` is only a
+    one-line summary). Public educational content — like the SD decks."""
+
+    __tablename__ = "study_notes"
+
+    slug = Column(String(160), primary_key=True)
+    title = Column(Text)
+    topic = Column(String(80))  # optional grouping, e.g. "system-design", "postgres"
+    date = Column(String(10))  # "YYYY-MM-DD" (authored / last updated)
+    body = Column(Text)  # markdown / HTML / mermaid / inline SVG — text, not binary
+    tags = Column(JSON)  # list[str]
+
+
 class DailyLog(Base):
     """One curated public entry per day (checked items + one-line summary/note).
     Private sections (Success Diary / PhD / etc.) are NOT stored here yet — they
