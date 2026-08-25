@@ -39,6 +39,9 @@ export default function DailyLogExplorer({
   const router = useRouter();
   const [q, setQ] = useState("");
   const [railOpen, setRailOpen] = useState(true);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  // tri-state per tag: "in" = only days with it, "ex" = hide days with it
+  const [tagState, setTagState] = useState<Map<string, "in" | "ex">>(new Map());
 
   // one active filter at a time — week OR month OR day — so they can't conflict
   const [week, setWeek] = useState("");
@@ -77,6 +80,11 @@ export default function DailyLogExplorer({
     for (const e of entries) if (e.week && !seen.has(e.week)) { seen.add(e.week); out.push({ week: e.week, year: e.date.slice(0, 4) }); }
     return out;
   }, [entries]);
+  const distinctTags = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of entries) for (const t of e.tags ?? []) s.add(t);
+    return [...s].sort();
+  }, [entries]);
 
   const filtered = useMemo(
     () =>
@@ -84,9 +92,14 @@ export default function DailyLogExplorer({
         if (week && e.week !== week) return false;
         if (monthKey && e.date.slice(0, 7) !== monthKey) return false;
         if (day && e.date !== day) return false;
+        for (const [t, st] of tagState) {
+          const has = (e.tags ?? []).includes(t);
+          if (st === "in" && !has) return false; // must have it
+          if (st === "ex" && has) return false; // must NOT have it
+        }
         return fuzzyMatch(q, searchBlob(e));
       }),
-    [entries, q, week, monthKey, day],
+    [entries, q, week, monthKey, day, tagState],
   );
 
   // week-marker dates (first entry of each week, top-down) — the vertical timeline
@@ -123,13 +136,68 @@ export default function DailyLogExplorer({
       </div>
 
       <div className="mb-3 flex items-center justify-between gap-3">
-        <button type="button" onClick={() => setRailOpen((v) => !v)} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:text-neutral-400">
-          {railOpen ? "⟨ Hide filters" : "Filters ⟩"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setRailOpen((v) => !v)} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:text-neutral-400">
+            {railOpen ? "⟨ Hide filters" : "Filters ⟩"}
+          </button>
+          {distinctTags.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setTagsOpen((v) => !v)}
+              aria-pressed={tagsOpen}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                tagState.size || tagsOpen
+                  ? "border-blue-400 text-blue-600 dark:border-blue-500/50 dark:text-blue-400"
+                  : "border-neutral-200 text-neutral-600 hover:border-neutral-400 dark:border-neutral-800 dark:text-neutral-400"
+              }`}
+            >
+              # tags{tagState.size ? ` · ${tagState.size}` : ""}
+            </button>
+          )}
+        </div>
         <span className="font-mono text-xs text-neutral-400">
-          {filtered.length}/{entries.length} days{activeLabel || q ? " · filtered" : ""}
+          {filtered.length}/{entries.length} days{activeLabel || q || tagState.size ? " · filtered" : ""}
         </span>
       </div>
+
+      {tagsOpen && distinctTags.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[11px] text-neutral-400">click: only → hide → off</span>
+          {distinctTags.map((t) => {
+            const st = tagState.get(t);
+            return (
+              <button
+                key={t}
+                type="button"
+                title={st === "in" ? "showing only these — click to hide them" : st === "ex" ? "hiding these — click to clear" : "click to show only these"}
+                onClick={() =>
+                  setTagState((prev) => {
+                    const n = new Map(prev);
+                    if (!n.has(t)) n.set(t, "in");
+                    else if (n.get(t) === "in") n.set(t, "ex");
+                    else n.delete(t);
+                    return n;
+                  })
+                }
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                  st === "in"
+                    ? "bg-blue-600 text-white dark:bg-blue-500"
+                    : st === "ex"
+                      ? "bg-rose-100 text-rose-700 line-through dark:bg-rose-500/20 dark:text-rose-300"
+                      : "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:hover:bg-blue-500/30"
+                }`}
+              >
+                {st === "ex" ? "−" : st === "in" ? "+" : ""}#{t}
+              </button>
+            );
+          })}
+          {tagState.size > 0 && (
+            <button type="button" onClick={() => setTagState(new Map())} className="ml-1 text-[11px] text-neutral-400 hover:underline">
+              clear
+            </button>
+          )}
+        </div>
+      )}
 
       <div className={railOpen ? "grid grid-cols-1 items-start gap-8 md:grid-cols-[220px_1fr]" : ""}>
         {railOpen && (
