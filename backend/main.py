@@ -259,20 +259,24 @@ def _auto_tags(sections: Optional[dict]) -> list[str]:
             tags.add("mindset")
         if "```" in (v or ""):
             tags.add("code")
-    sig = _signal_text(sections)
-    sl = sig.lower()
-    if _LC.search(sig) or "leetcode" in sl or "0x3f" in sl or any(
-        x in sig for x in ("刷题", "滑动窗口", "双指针", "哈希表", "二分", "回溯", "动态规划", "链表", "单调栈")
+    # LC / SD / PhD are day-SPECIFIC focuses, so a *planned* task counts → read
+    # all non-empty content (loose).
+    content = " ".join(v for k, v in sections.items() if k != "_preamble" and _section_has_content(v))
+    cl = content.lower()
+    if _LC.search(content) or "leetcode" in cl or "0x3f" in cl or any(
+        x in content for x in ("刷题", "滑动窗口", "双指针", "哈希表", "二分", "回溯", "动态规划", "链表", "单调栈")
     ):
         tags.add("leetcode")
-    if "system design" in sl or "系统设计" in sig or "dns" in sl or "rate limit" in sl or any(
-        x in sig for x in ("负载均衡", "一致性哈希", "限流", "缓存层")
+    if "system design" in cl or "系统设计" in content or "dns" in cl or "rate limit" in cl or any(
+        x in content for x in ("负载均衡", "一致性哈希", "限流", "缓存层")
     ):
         tags.add("system-design")
-    # PhD / grad-school applications (advisor selection, faculty, PhD apps)
-    if "择导" in sig or "advisor" in sl or "faculty" in sl or "导师" in sig or "博士" in sig or re.search(r"\bph\.?d", sl):
+    if "择导" in content or "advisor" in cl or "faculty" in cl or "导师" in content or "博士" in content or re.search(r"\bph\.?d", cl):
         tags.add("phd-application")
-    # resume + job recruiting (resume bullets, submitting applications)
+    # resume-recruit's signals (出简历bullet / 投递) are STANDING every-day template
+    # todos, so read only done work + prose (tight) to avoid tagging every day.
+    sig = _signal_text(sections)
+    sl = sig.lower()
     if any(x in sig for x in ("简历", "投递", "投简历")) or "resume" in sl or "bullet" in sl or "recruit" in sl or re.search(r"\bcv\b", sl):
         tags.add("resume-recruit")
     return sorted(tags)
