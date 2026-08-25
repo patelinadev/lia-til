@@ -228,8 +228,13 @@ def _daily_log_entries(include_sections: bool = False):
                 ],
             }
             if include_sections:
+                # private: every day, with its full sections
                 entry["sections"] = r.sections or {}
-            out.append(entry)
+                out.append(entry)
+            elif r.done or r.summary or r.note or r.leetcode:
+                # public: only days that have curated public content — a day that
+                # holds only private `sections` (not yet curated) stays hidden.
+                out.append(entry)
         return out
 
 
