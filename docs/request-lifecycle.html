@@ -307,6 +307,114 @@ if (!session) redirect("/api/auth/login");   <span class="cm">// requireAdmin bo
     </ul>
   </div>
 
+  <!-- ================= SECOND TRACE: daily-log filter lives in the URL ================= -->
+  <div class="keys" style="margin-top:46px">
+    <p class="kicker">/private/daily-log · line by line</p>
+    <h1 style="margin-top:6px">A second request — the filter lives in the URL</h1>
+    <p class="sub">Now a different page: the private <b>Daily Log</b>. You turn on a tag filter, click a day, then page to the one before it — and the filter <b>follows you the whole way</b>. The trick: there is <b>no shared client store</b>. The filter is written into the <b>URL</b>, and each side reads it back. The two <b>secret gates are exactly the same</b> as the first trace (JWT on the Vercel server, then <code>x-admin-secret</code> to FastAPI) — so here we zoom in on the <b>filter → URL → filtered pager</b> mechanic instead.</p>
+
+    <div style="border:1px solid var(--line);border-left:3px solid var(--server);border-radius:12px;background:var(--surface);padding:14px 16px;margin:0 0 26px;font-size:13.5px;color:var(--ink-soft)">
+      <p style="margin:0 0 6px;color:var(--ink)"><b>One codec, two readers</b> — <code>web/lib/daily.ts</code></p>
+      <p style="margin:0"><code>filterToQuery(f)</code> turns the filter into a query string; <code>parseFilter(searchParams)</code> turns it back. The <b>client list</b> writes it (and appends it to every day link); the <b>server day page</b> reads it. Because both call the <em>same</em> two functions, the list and the pager can never disagree about what "filtered" means. Compact keys: <code>q</code> search · <code>w</code>/<code>m</code>/<code>d</code> week/month/day · <code>tin</code> tags-in · <code>tex</code> tags-out.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+
+    <div class="step browser">
+      <div class="num">1</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-browser"></span>Browser</span>
+        <div class="act">On the list you click the <code>#leetcode</code> chip. <span>It's a Client Component — this runs in your browser, no request goes out yet.</span></div>
+        <div class="code"><span class="cm">// DailyLogExplorer.tsx — the chip cycles only → hide → off</span>
+setTagState(m =&gt; m.set("leetcode", "in"));   <span class="cm">// "in" = day must have the tag</span>
+
+<span class="cm">// state, re-serialized every render — this is the whole "filter":</span>
+const query = filterToQuery({ q, week, month, day, tin, tex });</div>
+        <div class="ret"><span class="lab">→ query is now</span> <span class="v">"?tin=leetcode"</span> — the list re-filters <b>in place</b>, and every day link now carries this string.</div>
+        <span class="file">app/components/DailyLogExplorer.tsx · lib/daily.ts</span>
+      </div>
+    </div>
+
+    <div class="step browser">
+      <div class="num">2</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-browser"></span>Browser</span>
+        <div class="act">You click a day card. <span>It's a plain <code>&lt;Link&gt;</code> — the filter rides along in the URL.</span></div>
+        <div class="code"><span class="cm">// the href the card was rendered with (query appended)</span>
+GET /private/daily-log/2026-08-24?tin=leetcode
+Cookie: lt_session=eyJhbGciOiJIUzI1NiJ9…   <span class="cm"># the JWT, auto-attached</span></div>
+        <span class="handoff">↓ travels to the Vercel server</span>
+      </div>
+    </div>
+
+    <div class="step server">
+      <div class="num">3</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-server"></span>Vercel server</span>
+        <div class="act">The day page is a Server Component. Same gate ① as before — is this the admin? <span>Then it reads the filter straight back out of the URL.</span></div>
+        <div class="code"><span class="cm">// app/private/daily-log/[date]/page.tsx</span>
+await requireAdmin();                     <span class="cm">// gate ① — JWT (AUTH_SECRET); null → 307 to login</span>
+const { date } = await params;            <span class="cm">// "2026-08-24"</span>
+const filter = parseFilter(searchParams); <span class="cm">// reads ?tin=leetcode back into a filter</span>
+const query  = filterToQuery(filter);     <span class="cm">// "?tin=leetcode" — to re-append downstream</span></div>
+        <div class="ret"><span class="lab">→ filter is</span> <span class="v">{ q:"", week:"", month:"", day:"", tin:["leetcode"], tex:[] }</span></div>
+        <span class="file">app/private/daily-log/[date]/page.tsx · lib/daily.ts · lib/auth.ts</span>
+      </div>
+    </div>
+
+    <div class="step data">
+      <div class="num">4</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-data"></span>FastAPI + Neon</span>
+        <div class="act">Fetch every logged day — gate ② is the same shared secret. <span>The filter is applied on the server, not in SQL.</span></div>
+        <div class="code"><span class="cm">// lib/private.ts — getFullDailyLog(), server→server</span>
+fetchJsonWithRetry(".../api/daily-log/full",
+  { headers: { "x-admin-secret": BACKEND_SECRET } });  <span class="cm">// gate ② — 401 if it doesn't match</span></div>
+        <div class="ret"><span class="lab">→ returns</span> <span class="v">every day, newest-first</span> — each with its <code>tags</code> (manual + auto, merged by the backend).</div>
+        <span class="handoff">↑ JSON travels back to the Vercel server</span>
+      </div>
+    </div>
+
+    <div class="step server">
+      <div class="num">5</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-server"></span>Vercel server</span>
+        <div class="act">Scope the pager to the <b>filtered</b> set — this is why the filter had to travel.</div>
+        <div class="code"><span class="cm">// page.tsx — walk neighbours within the SAME filter (drop the single-day pin)</span>
+const scope = filterEntries(entries, { ...filter, day: "" });  <span class="cm">// only #leetcode days</span>
+const sIdx  = scope.findIndex(x =&gt; x.date === date);
+const newer = scope[sIdx - 1]?.date;   <span class="cm">// ↑ the next leetcode day</span>
+const older = scope[sIdx + 1]?.date;   <span class="cm">// ↓ the previous leetcode day</span></div>
+        <div class="ret"><span class="lab">→ the ↑/↓ links become</span> <span class="v">/private/daily-log/&lt;older|newer&gt;?tin=leetcode</span>
+   <span class="cm">// the query is re-appended — so the next hop is filtered too</span></div>
+        <span class="handoff">↓ finished HTML (the day + the right-edge pager) sent to the browser</span>
+      </div>
+    </div>
+
+    <div class="step browser">
+      <div class="num">6</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-browser"></span>Browser</span>
+        <div class="act">You see the day, with a fixed pager on the right edge. You press ↓.</div>
+        <div class="code"><span class="cm">// it's just the link from step 5 — a fresh request, filter still attached</span>
+GET /private/daily-log/2026-08-22?tin=leetcode   <span class="cm"># the previous LEETCODE day, not just the previous day</span></div>
+        <div class="ret"><span class="lab">→ you land on</span> <span class="v">the day before — still inside the filter.</span> The loop repeats from step 3.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="keys">
+    <h2>Why the URL is the state</h2>
+    <ul>
+      <li><b>No shared store</b> → the client list and the server day page never talk directly. The URL is the handoff, so a link (or a refresh, or a shared URL) reproduces the exact filtered view.</li>
+      <li><b>One codec, both ends</b> → <code>filterToQuery</code> (list writes) and <code>parseFilter</code> (day page reads) are inverses in <code>lib/daily.ts</code>; the pager reuses <code>filterEntries</code>, so "filtered" means the same thing everywhere.</li>
+      <li><b>The pager drops <code>day</code></b> → paging walks the filter <em>minus</em> the single-day pin (<code>{ ...filter, day:"" }</code>), so ↑/↓ move through the whole filtered range, not a set of one.</li>
+      <li><b>Tags are labels, not secrets</b> → they're served on the public list too; only the per-day <em>sections</em> stay behind the two gates.</li>
+    </ul>
+  </div>
+
   <div class="keys" style="margin-top:8px">
     <h2>The other direction — writing the DB (CRUD)</h2>
     <p style="margin:0 0 12px;color:var(--ink-soft);font-size:14px">The trace above is a <b>read</b> that starts in the browser and passes <b>both</b> gates. A <b>write</b> has no browser and no session — it's a direct call carrying only <b class="kk" style="color:var(--key)">gate ②</b>'s <code>BACKEND_SECRET</code>. This is how the daily log / tags / sections are edited now — no local files:</p>
