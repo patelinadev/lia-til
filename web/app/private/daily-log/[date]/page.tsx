@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { getFullDailyLog } from "@/lib/private";
-import { realSections } from "@/lib/daily";
+import { realSections, filterEntries, filterToQuery, parseFilter } from "@/lib/daily";
 import SectionBody from "@/app/components/SectionBody";
 import DataError from "@/app/components/DataError";
 import TagChips from "@/app/components/TagChips";
@@ -16,14 +16,25 @@ export async function generateMetadata({ params }: { params: Promise<{ date: str
   return { title: `${date} · Daily Log`, robots: { index: false, follow: false } };
 }
 
-export default async function PrivateDayPage({ params }: { params: Promise<{ date: string }> }) {
+export default async function PrivateDayPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ date: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireAdmin();
   const { date } = await params;
+  const sp = await searchParams;
+  const usp = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) if (typeof v === "string") usp.set(k, v);
+  const filter = parseFilter(usp);
+  const query = filterToQuery(filter);
   const entries = await getFullDailyLog();
 
   const back = (
     <Link
-      href="/private/daily-log"
+      href={`/private/daily-log${query}`}
       className="text-sm text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-300"
     >
       &larr; Daily Log
@@ -39,13 +50,16 @@ export default async function PrivateDayPage({ params }: { params: Promise<{ dat
     );
   }
 
-  // entries are newest-first; find this day and its logged neighbours (skipping
-  // any calendar gaps) so we can page prev/next without returning to the list.
   const idx = entries.findIndex((x) => x.date === date);
   if (idx === -1) notFound();
   const e = entries[idx];
-  const newer = idx > 0 ? entries[idx - 1].date : undefined; // the day after
-  const older = idx < entries.length - 1 ? entries[idx + 1].date : undefined; // the day before
+
+  // prev/next move within the FILTERED set (same filter as the list), so paging
+  // respects the active filter; ignore any single-day filter for the pager scope.
+  const scope = filterEntries(entries, { ...filter, day: "" });
+  const sIdx = scope.findIndex((x) => x.date === date);
+  const newer = sIdx > 0 ? scope[sIdx - 1].date : undefined; // the day after
+  const older = sIdx >= 0 && sIdx < scope.length - 1 ? scope[sIdx + 1].date : undefined; // the day before
 
   const secs = realSections(e.sections);
 
@@ -53,7 +67,7 @@ export default async function PrivateDayPage({ params }: { params: Promise<{ dat
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
       {back}
 
-      <DaySideNav older={older} newer={newer} />
+      <DaySideNav older={older} newer={newer} query={query} />
 
       <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="font-mono text-2xl font-bold sm:text-3xl">{e.date}</h1>
@@ -118,7 +132,7 @@ export default async function PrivateDayPage({ params }: { params: Promise<{ dat
  *   ↑ = next day (newer) · ↓ = previous day (older).
  * Moves between logged days only; ends are shown disabled.
  */
-function DaySideNav({ older, newer }: { older?: string; newer?: string }) {
+function DaySideNav({ older, newer, query }: { older?: string; newer?: string; query: string }) {
   const btn =
     "flex h-11 w-11 items-center justify-center text-xl text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100";
   const off = "flex h-11 w-11 items-center justify-center text-xl text-neutral-300 dark:text-neutral-700";
@@ -128,19 +142,19 @@ function DaySideNav({ older, newer }: { older?: string; newer?: string }) {
       className="fixed right-3 top-1/2 z-30 flex -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white/90 shadow-sm backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/90"
     >
       {newer ? (
-        <Link href={`/private/daily-log/${newer}`} className={btn} title={`Next day · ${newer}`} aria-label={`Next day ${newer}`}>
+        <Link href={`/private/daily-log/${newer}${query}`} className={btn} title={`Next day · ${newer}`} aria-label={`Next day ${newer}`}>
           &uarr;
         </Link>
       ) : (
-        <span className={off} title="Latest — no newer day" aria-hidden>&uarr;</span>
+        <span className={off} title="Latest match — no newer day" aria-hidden>&uarr;</span>
       )}
       <span className="mx-2 h-px bg-neutral-200 dark:bg-neutral-800" />
       {older ? (
-        <Link href={`/private/daily-log/${older}`} className={btn} title={`Previous day · ${older}`} aria-label={`Previous day ${older}`}>
+        <Link href={`/private/daily-log/${older}${query}`} className={btn} title={`Previous day · ${older}`} aria-label={`Previous day ${older}`}>
           &darr;
         </Link>
       ) : (
-        <span className={off} title="Earliest — no older day" aria-hidden>&darr;</span>
+        <span className={off} title="Earliest match — no older day" aria-hidden>&darr;</span>
       )}
     </nav>
   );
