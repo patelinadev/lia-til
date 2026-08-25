@@ -67,6 +67,9 @@ export type LogEntry = {
   note: string | null;
   /** LeetCode problems done this day — kept in the log, linked out to LeetCode */
   leetcode?: LogProblem[];
+  /** Public-safe sections ({heading → markdown}) — the backend filters out the
+   * private ones (Success Diary / SOP / To-Do) before this ever reaches a page. */
+  sections?: Record<string, string> | null;
 };
 
 /** The public problem-page URL, derived from the solution URL's slug. */
