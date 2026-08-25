@@ -13,6 +13,7 @@
     --data:#A5620C;    --data-bg:#F6ECDA;     --data-line:#E7CE9F;
     --warn:#AE3F3A;    --warn-bg:#F7E7E5;     --warn-line:#EBC3BF;
     --ret:#1C7A54;
+    --key:#B0790C;     --key-bg:#FBF0D8;      --key-line:#E9CE96;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -24,6 +25,7 @@
       --data:#E0A458;    --data-bg:#2E2416;    --data-line:#52401F;
       --warn:#E58079;    --warn-bg:#331D1B;    --warn-line:#593230;
       --ret:#64C79A;
+      --key:#E3AC57;     --key-bg:#2C2415;      --key-line:#54421F;
     }
   }
   :root[data-theme="dark"] {
@@ -35,6 +37,7 @@
     --data:#E0A458;    --data-bg:#2E2416;    --data-line:#52401F;
     --warn:#E58079;    --warn-bg:#331D1B;    --warn-line:#593230;
     --ret:#64C79A;
+    --key:#E3AC57;     --key-bg:#2C2415;      --key-line:#54421F;
   }
 
   * { box-sizing:border-box; }
@@ -124,6 +127,17 @@
     .selfn { z-index:1; justify-self:center; background:var(--surface); border:1px solid var(--line-strong); border-radius:8px; padding:4px 10px; font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-soft); white-space:nowrap; }
     .selfn.s2{grid-column:2;} .selfn.s3{grid-column:3;}
     .seqbreak { grid-column:1 / 4; text-align:center; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--warn); }
+    /* secret gates — the two checkpoints, made to stand out */
+    .selfn.gate { border-color:var(--key-line); background:var(--key-bg); box-shadow:inset 3px 0 0 var(--key); }
+    .selfn .kk { color:var(--key); font-weight:600; }
+    .gnum { display:inline-grid; place-items:center; width:15px; height:15px; margin-right:5px; border-radius:50%; background:var(--key); color:var(--paper); font-size:9px; font-weight:700; vertical-align:middle; }
+    .arw .lbl b { color:var(--key); }
+    .gates { margin:0 0 30px; border:1px solid var(--key-line); border-radius:12px; background:var(--surface); padding:13px 15px; }
+    .gates-h { margin:0 0 10px; font-size:13.5px; font-weight:600; color:var(--ink); } .gates-h em { font-style:italic; }
+    .gates-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media (max-width:560px){ .gates-row{ grid-template-columns:1fr; } }
+    .gate-card { border:1px solid var(--line); border-left:3px solid var(--key); border-radius:9px; background:var(--code); padding:9px 11px; font-size:12.5px; line-height:1.5; color:var(--ink-soft); }
+    .gate-card b { color:var(--ink); } .gate-card em { color:var(--ink); font-style:italic; } .gate-card .gnum { vertical-align:baseline; }
   </style>
   <div class="seqwrap"><div class="seq">
     <div class="seqhead"><div class="h1">🧑 Browser</div><div class="h2">🟢 Vercel server</div><div class="h3">🟠 FastAPI + Neon</div></div>
@@ -133,19 +147,27 @@
       <div class="ll" style="left:83.333%"></div>
 
       <div class="mrow"><div class="arw a12 right"><span class="lbl">GET /private/applications &nbsp;(+ lt_session cookie)</span></div></div>
-      <div class="mrow"><div class="selfn s2">⟳ verify JWT with AUTH_SECRET → session ok</div></div>
-      <div class="mrow"><div class="arw a23 right"><span class="lbl">GET /api/applications/full &nbsp;(+ x-admin-secret)</span></div></div>
-      <div class="mrow"><div class="selfn s3">⟳ secret matches → query Neon DB</div></div>
+      <div class="mrow"><div class="selfn s2 gate"><span class="gnum">1</span>⟳ verify JWT · <b class="kk">AUTH_SECRET</b> → session ok</div></div>
+      <div class="mrow"><div class="arw a23 right"><span class="lbl">GET /api/applications/full &nbsp;(+ <b>x-admin-secret</b>)</span></div></div>
+      <div class="mrow"><div class="selfn s3 gate"><span class="gnum">2</span>⟳ <b class="kk">BACKEND_SECRET</b> matches → query Neon</div></div>
       <div class="mrow"><div class="arw a23 left dash"><span class="lbl">{ total: 129, applications: [ … ] }</span></div></div>
       <div class="mrow"><div class="selfn s2">⟳ build the HTML table</div></div>
       <div class="mrow"><div class="arw a12 left dash"><span class="lbl">HTML (the page you see)</span></div></div>
 
       <div class="mrow"><div class="seqbreak">— incognito · no cookie —</div></div>
       <div class="mrow"><div class="arw a12 right"><span class="lbl">GET /private/applications &nbsp;(no cookie)</span></div></div>
-      <div class="mrow"><div class="selfn s2">⟳ getSession() → null</div></div>
-      <div class="mrow"><div class="arw a12 left dash"><span class="lbl">307 → /api/auth/login &nbsp;(FastAPI never called)</span></div></div>
+      <div class="mrow"><div class="selfn s2 gate"><span class="gnum">1</span>⟳ getSession() → null · <b class="kk">gate ① rejects</b></div></div>
+      <div class="mrow"><div class="arw a12 left dash"><span class="lbl">307 → /api/auth/login &nbsp;(gate ② never reached)</span></div></div>
     </div>
   </div></div>
+
+  <div class="gates">
+    <p class="gates-h">🔑 Two gates, two <em>different</em> secrets — and neither ever reaches your browser</p>
+    <div class="gates-row">
+      <div class="gate-card"><span class="gnum">1</span><b>AUTH_SECRET</b> signs &amp; verifies your <b>session</b> JWT on the Vercel server — it proves <em>“you are the admin.”</em> Fail → 307 to login, and FastAPI is never called.</div>
+      <div class="gate-card"><span class="gnum">2</span><b>BACKEND_SECRET</b> is the <code>x-admin-secret</code> header on the server→FastAPI call — it proves <em>“this call is from our own server.”</em> Server-to-server only; the browser never sees it.</div>
+    </div>
+  </div>
 
   <div style="border:1px solid var(--line);border-left:3px solid var(--data);border-radius:12px;background:var(--surface);padding:14px 16px;margin:0 0 30px;font-size:13.5px;color:var(--ink-soft)">
     <p style="margin:0 0 8px;color:var(--ink)"><b>Why you never "see" the 307</b></p>
