@@ -79,10 +79,11 @@ class Resume(Base):
 
     __tablename__ = "resumes"
 
-    slug = Column(String(120), primary_key=True)  # 'base' | e.g. '001-pathai-swe'
+    slug = Column(String(120), primary_key=True)  # 'base' | the Resume # e.g. '001'
     kind = Column(String(20))  # 'base' | 'tailored'
-    app_num = Column(Integer)  # nullable; links a tailored résumé → its application
-    company = Column(String(200))  # nullable (tailored only)
+    # NOTE: no app_num — one résumé is reused across MANY applications. The link
+    # lives on the application side: applications.resume (a Resume #) → this slug.
+    company = Column(String(200))  # nullable — what it was tailored for (metadata)
     role = Column(Text)  # nullable (tailored only)
     date = Column(String(10))  # "YYYY-MM-DD"
     fmt = Column(String(20))  # 'markdown' | 'tex' (API field name: "format")

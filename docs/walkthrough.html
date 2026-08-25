@@ -265,6 +265,7 @@
     <a href="#p2s3"><span class="st">P2·S3</span> GitHub login <span class="dot dot--go"></span></a>
     <a href="#p2s4"><span class="st">P2·S4</span> CRUD API <span class="dot dot--go"></span></a>
     <a href="#p2s5"><span class="st">P2·S5</span> Cloud daily log <span class="dot dot--you"></span></a>
+    <a href="#p2s6"><span class="st">P2·S6</span> Résumé + sync <span class="dot dot--you"></span></a>
   </div>
 
   <div class="legend">
@@ -549,7 +550,8 @@ git push origin v0.2.0</pre>
           <tr><td class="v">S2</td><td>Instant sync — all content moved to the backend (Daily Log · LeetCode · System Design)</td><td>✅ Done (v0.4.0)</td></tr>
           <tr><td class="v">S3</td><td>GitHub login + private full views (custom OAuth + jose session)</td><td>✅ Done (v0.5.x)</td></tr>
           <tr><td class="v">S4</td><td>CRUD write API — cloud-only data (all 4 tables; local sources retired)</td><td>✅ Done (v0.6.0)</td></tr>
-          <tr><td class="v">S5</td><td>Cloud-only daily log (full record + tags + rich UI); skills write the API / retire Obsidian</td><td>🚧 In progress (v0.7.x)</td></tr>
+          <tr><td class="v">S5</td><td>Cloud-only daily log (full record + tags + rich UI); skills write the API / retire Obsidian (<b>skills cutover ✅ v0.7.1</b>; study_notes + cron remain)</td><td>🚧 In progress (v0.7.x)</td></tr>
+          <tr><td class="v">S6</td><td>Résumé integration — resumes table + gated CRUD; public /resume + private archive (display deferred); <code>jd-based-resume</code> publishes applications + résumés straight to the API</td><td>🚧 Backend live · display deferred (v0.8.0)</td></tr>
         </tbody>
       </table>
     </div>
@@ -1066,13 +1068,86 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
     <div class="phase"><span class="phase__k">→</span><h3>Remaining S5</h3></div>
     <div class="card">
       <ul>
-        <li><b>Skills write the API</b> (next): rewire daily-planner / learning-log to <code>POST</code> the CRUD API — <b>skip Obsidian, edit the DB directly</b>. The write mechanism is proven; only the skill-definition edits remain.</li>
-        <li><b>INDEX write path</b>: the 📖 navigator is <b>read-only</b> in the UI — it's populated by a manual <code>PUT /api/index</code>. Give it a real writer: an in-page private editor, or fold INDEX regeneration into the daily-log wrap-up skill so each wrap-up rebuilds the TL;DR and PUTs it.</li>
+        <li><b>Skills write the API ✅ DONE</b> (v0.7.1): learning-log + daily-planner rewritten to read/write the daily log via the CRUD API — <b>skip Obsidian</b>, no daily <code>.md</code> file. Dropped Search / Weekly / Flashcards / Inbox; renamed the 快报 section → <code>Quick Glance</code>; all sections private, public = one-line <code>summary</code> (+ leetcode chips). Stale <code>~/.claude/commands/daily-planner</code> copy retired.</li>
+        <li><b>INDEX write path</b>: the 📖 navigator's writer via <b>skill auto-regen</b> is now in place — learning-log's Refresh INDEX rebuilds the TL;DR from the DB and <code>PUT</code>s <code>/api/index</code>. Still open: an <b>in-page</b> private editor (nice-to-have).</li>
         <li><b>English summaries</b>: the migrated days have no one-line <code>summary</code> yet (the vault has none) — curate them so those days surface on the public timeline.</li>
         <li><b>Study notes</b>: a separate <code>study_notes</code> table (text-first body — SVG/HTML/mermaid inline; object storage only if screenshots pile up).</li>
         <li><b>Cloud cron</b> (Render Cron Job) for scheduled / automated updates — zero local, zero laptop.</li>
       </ul>
     </div>
+  </section>
+
+  <!-- ============================ P2 · S6 ============================ -->
+  <section class="stage" id="p2s6">
+    <div class="stage__head">
+      <span class="badge">P2 · S6</span>
+      <h2>Résumé integration + cross-repo publish</h2>
+      <span class="status status--wip">🚧 Backend live · display deferred</span>
+      <span class="stage__ver">v0.8.0</span>
+    </div>
+    <p class="goal">Bring résumés into the same cloud model as everything else, and wire the
+    <b>other repo</b> (<code>jd-based-resume</code>) to publish straight to the API. Two résumé
+    kinds: a single <b>public master</b> (base) and the <b>private per-JD tailored</b> ones.
+    Backend + pages are built; the public/private <b>display is deferred</b> for now (there's
+    no <code>base_resume.md</code> yet, and Lia chose to skip résumé display), so this stage is
+    "plumbing in place, UI parked".</p>
+
+    <div class="callout"><span class="k">Data model — App # ≠ Resume #</span><span>The
+    application ledger has <b>two different numbers</b>: <code>App #</code> (one per
+    application, the applications PK) and <code>Resume</code> (the <code>outputs/NNN</code>
+    file sent). <b>One résumé is reused across many applications</b> (résumé 001 sent 11×), so
+    the relation is <b>one résumé → many applications</b>. A résumé therefore has <b>no
+    app_num</b>; the link lives on the application: <code>applications.resume</code> (a Resume #)
+    → the résumé's <code>slug</code>.</span></div>
+
+    <div class="phase"><span class="phase__k">A</span><h3>lia-til side — table + API + pages (this repo)</h3></div>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Table</span><div><code>models.py</code> —
+      <code>Resume(slug PK, kind, company, role, date, fmt, body)</code>. <code>kind='base'</code>
+      = the one public master; <code>kind='tailored'</code> = per-JD (keyed by Resume #). Body
+      is text (markdown/tex); <b>no binary/PDF</b> (object storage deferred). New table →
+      lifespan <code>create_all</code> provisions it.</div></div>
+      <div class="rb__row"><span class="rb__n">API</span><div><code>main.py</code> —
+      <code>GET /api/resume</code> (<b>public — base only</b>, tailored can never leak),
+      <code>GET /api/resume/full</code> + <code>GET/PUT/PATCH/DELETE /api/resume/{slug}</code> +
+      <code>POST /api/resume/bulk</code> (all gated). Verified by a 17-assertion SQLite smoke
+      test (public leaks nothing, gated full returns all, bulk/delete/404).</div></div>
+      <div class="rb__row"><span class="rb__n">Pages</span><div><b>New</b>
+      <code>/resume</code> (public master, renders markdown; tex shown as source) +
+      <code>/private/resume</code> (private archive: master + every tailored, collapsible).
+      Both force-dynamic + <code>maxDuration=60</code>.</div></div>
+      <div class="rb__row"><span class="rb__n">Display deferred</span><div>No
+      <code>base_resume.md</code> exists yet, and Lia chose to skip résumé display, so the
+      home-hub + private-hub résumé cards are <b>hidden</b>. The routes + backend stay
+      dormant — re-add the cards (marked in code) to turn it back on.</div></div>
+      <p class="rb__upd"><b>To turn résumé display on later:</b> create a
+      <code>base_resume.md</code>, have <code>jd-based-resume</code> push it, and un-hide the
+      hub cards.</p>
+    </div>
+
+    <div class="phase"><span class="phase__k">B</span><h3>jd-based-resume side — publish straight to the API</h3></div>
+    <p class="phase__note">The other repo owns the source files (git-ignored, private) and
+    publishes them via the API — the same "no local-only, DB is source of truth" model as the
+    daily log. Spec handed off as <code>LIA_TIL_SYNC_SPEC.md</code>.</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Applications</span><div><code>application_log.md</code>
+      → <code>POST /api/applications/bulk</code> (idempotent upsert of the whole ledger).
+      <b>Replaces the deleted <code>import_ledger.py</code>.</b> Current state: the DB has
+      <b>129</b> apps (stale) while the ledger is ~<b>154</b> — the bulk sync catches it up and
+      keeps it live. Public shows only anonymized aggregates (backend derives them).</div></div>
+      <div class="rb__row"><span class="rb__n">Résumés</span><div><code>outputs/*.tex</code> →
+      <code>/api/resume</code> (<code>slug</code> = Resume #, <code>format="tex"</code>, kept as
+      source). <b>Deferred</b> alongside the display — applications sync is the active pipeline.</div></div>
+      <div class="rb__row"><span class="rb__n">Ongoing loop</span><div>"I applied to these / this
+      got rejected" → the <code>jd-based-resume</code> window edits the ledger + runs the sync →
+      DB updates → the lia-til applications pages reflect it <b>live on next refresh</b> (no
+      deploy — pages read the DB at request time).</div></div>
+    </div>
+
+    <div class="callout me"><span class="k">Privacy holds</span><span>The applications table
+    (full ledger, company names) and tailored résumés are <b>private</b> — gated API only;
+    only anonymized application <b>aggregates</b> are public. The sensitive files never enter a
+    public git repo; the secret stays in <code>~/.til-env</code>, never printed.</span></div>
   </section>
 
   <!-- ============================ VERSION HISTORY ============================ -->
@@ -1083,16 +1158,18 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
       <tbody>
         <tr><td class="v">v0.1.0</td><td>P1 · S1 — First Deploy (Next.js + Vercel auto-deploy pipeline)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.2.0</td><td>P1 · S2 core — section routes + LeetCode table (filter/sort/status/colored topics) + curated Daily Log</td><td>✅ Done</td></tr>
-        <tr><td class="v">v0.2.x</td><td>P1 · S2 wrap-up — anonymized Applications dashboard + calendar · System Design tree + per-deck detail pages · "Today I Learned" home + footer</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.2.1</td><td>P1 · S2 wrap-up — anonymized Applications dashboard + calendar · System Design tree + per-deck detail pages · "Today I Learned" home + footer</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.3.0</td><td>P2 · S1 — FastAPI (Render) + Postgres (Neon); Applications served live via the aggregate API (dynamic, no rebuild)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.4.0</td><td>P2 · S2 — instant sync for all content: Daily Log · LeetCode · System Design each moved to the backend (table + endpoint + importer + dynamic page)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.0</td><td>P2 · S3 — GitHub login (custom OAuth + jose session) + private <code>/private</code> full-ledger view; backend private endpoint behind a shared secret</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.1</td><td>P2 · S3+ — private area buildout: <code>/private</code> hub + <code>/private/daily-log</code> (private channel) + a signed-in-only site-wide nav to hop between public &amp; private</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.5.2</td><td>P2 · S3+ — private view read-UX: Applications ledger gets fuzzy search + Role-column filter + status filter + live stats bar; private Daily Log gets a compact left-edge jump rail (week dropdown + year→month→day calendar picker) + LeetCode solution links (resolved by id from <code>leetcode.json</code>, same as public)</td><td>✅ Done</td></tr>
-        <tr><td class="v">v0.5.3</td><td>P2 · S3+ — backend cold-start resilience: retry-until-awake fetch (<code>lib/net.ts</code>) + <code>maxDuration=60</code> so cold loads wait for live data instead of dropping to the stale snapshot/empty; null-vs-empty private states; refreshed <code>applications.json</code> fallback; removed the stale public "Updated" line. Keep-warm <code>/health</code> ping = manual (runbook in P2·S3).</td><td>🚧 Code live · ping pending</td></tr>
+        <tr><td class="v">v0.5.3</td><td>P2 · S3+ — backend cold-start resilience: retry-until-awake fetch (<code>lib/net.ts</code>) + <code>maxDuration=60</code> so cold loads wait for live data instead of dropping to the stale snapshot/empty; null-vs-empty private states; refreshed <code>applications.json</code> fallback; removed the stale public "Updated" line. Keep-warm <code>/health</code> ping is <b>live</b> (cron-job.org "lia-til keep warm", every 5 min) — the backend stays warm, so no idle cold-start in normal use.</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.6.0</td><td>P2 · S4 — CRUD write API (cloud-only data): secret-gated Create/Update/Delete + bulk per table (all 4 tables); Neon becomes the single source of truth; local <code>web/content/*</code> + importers deleted; public pages switch to error states (no fallback)</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.7.0</td><td>P2 · S5 — cloud-only daily log: full vault record stored in a <code>sections</code> column (store-everything, filter-on-read; 38 days migrated via the API); rule-based tags (served public+private); unified public/private explorer (fuzzy + calendar/week/tri-state-tag filters, filter persisted in the URL); per-day pages with checkbox/table/code-highlight rendering + ↑/↓ pager; the <code>~/.til-env</code> secret write-flow (skills → API); a private <code>📖 INDEX/TL;DR</code> navigator (<code>site_meta</code> kv + gated <code>/api/index</code>) shown as a first-visit book drawer</td><td>🚧 In progress</td></tr>
-        <tr><td class="v">v0.7.x+</td><td>S5 last mile — rewire skills (daily-planner / learning-log) to write the CRUD API &amp; skip Obsidian · a write path for the INDEX (in-page editor or skill auto-regen) · English summaries for migrated days · <code>study_notes</code> table · cloud scheduled sync (Render Cron)</td><td>🗺️ Planned</td></tr>
+        <tr><td class="v">v0.7.1</td><td>P2 · S5 — <b>skills write the API (skip Obsidian)</b>: learning-log + daily-planner rewritten to read/write the daily log via the CRUD API instead of the vault (no daily <code>.md</code> file). Dropped Search / Weekly / Flashcards / Inbox; renamed the 快报 section → <code>Quick Glance</code>; all sections private, public = one-line <code>summary</code> (+ leetcode chips); INDEX refresh = skill auto-regen (<code>PUT /api/index</code>). Stale <code>~/.claude/commands/daily-planner</code> copy retired.</td><td>✅ Done</td></tr>
+        <tr><td class="v">v0.8.0</td><td>P2 · S6 — <b>résumé integration</b>: <code>resumes</code> table + gated CRUD (public <code>/api/resume</code> = base only; <code>/full</code> + CRUD + bulk gated); public <code>/resume</code> + private archive pages built, then <b>display deferred</b> (no <code>base_resume.md</code> yet). Cross-repo publish spec handed to <code>jd-based-resume</code> (it writes applications + résumés straight to the API; <b>App# ≠ Resume#</b>, one résumé reused across many apps, link via <code>applications.resume</code> → <code>résumé.slug</code>).</td><td>🚧 Backend live · display deferred</td></tr>
+        <tr><td class="v">next</td><td>Planned — applications catch-up (DB 129 → ledger ~154, via the jd-based-resume sync) · résumé display once a <code>base_resume.md</code> exists · <code>study_notes</code> table · in-page INDEX editor · English summaries for migrated days · cloud scheduled sync (Render Cron)</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
   </div>
