@@ -70,6 +70,25 @@ class DailyLog(Base):
     tags = Column(JSON)  # list[str]
 
 
+class Resume(Base):
+    """Résumés. `kind='base'` is the single public master résumé (rendered on the
+    public /resume page). `kind='tailored'` rows are the per-JD tailored résumés
+    (one per application, linked by `app_num`) — PRIVATE (they carry company
+    names), served only on the gated /full endpoint. `body` is text
+    (markdown/tex); no binary/PDF is stored here — object storage is deferred."""
+
+    __tablename__ = "resumes"
+
+    slug = Column(String(120), primary_key=True)  # 'base' | e.g. '001-pathai-swe'
+    kind = Column(String(20))  # 'base' | 'tailored'
+    app_num = Column(Integer)  # nullable; links a tailored résumé → its application
+    company = Column(String(200))  # nullable (tailored only)
+    role = Column(Text)  # nullable (tailored only)
+    date = Column(String(10))  # "YYYY-MM-DD"
+    fmt = Column(String(20))  # 'markdown' | 'tex' (API field name: "format")
+    body = Column(Text)  # the résumé text
+
+
 class SiteMeta(Base):
     """Small key-value store for singleton documents that aren't per-day. Currently
     holds the private INDEX / TL;DR navigator (key='index'); `value` is markdown.

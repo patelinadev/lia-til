@@ -75,3 +75,29 @@ export async function getIndex(): Promise<SiteIndex | null> {
   if (!data) return null;
   return { value: data.value ?? "", updatedAt: data.updatedAt ?? null };
 }
+
+export type ResumeRow = {
+  slug: string;
+  kind: string; // "base" | "tailored"
+  appNum: number | null;
+  company: string | null;
+  role: string | null;
+  date: string | null;
+  format: string | null; // "markdown" | "tex"
+  body: string | null;
+};
+
+/** Fetch every résumé (base + all tailored) from the backend's private endpoint
+ * (secret-gated). Called only after the admin session is verified. Returns `null`
+ * when the backend can't be reached (transient cold start) vs `[]` for none. */
+export async function getFullResumes(): Promise<ResumeRow[] | null> {
+  const base = process.env.API_URL?.replace(/\/$/, "");
+  const secret = process.env.BACKEND_SECRET;
+  if (!base || !secret) return null;
+  const data = await fetchJsonWithRetry<{ resumes: ResumeRow[] }>(
+    `${base}/api/resume/full`,
+    { headers: { "x-admin-secret": secret } },
+  );
+  if (!data) return null;
+  return data.resumes ?? [];
+}

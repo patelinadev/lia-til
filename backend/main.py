@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text
 
 from db import Base, SessionLocal, engine
-from models import Application, DailyLog, LeetcodeProblem, SDDeck, SiteMeta
+from models import Application, DailyLog, LeetcodeProblem, Resume, SDDeck, SiteMeta
 
 LEETCODE_TRACK = "0x3f Basic Algorithms"
 LEETCODE_TRACK_URL = "https://space.bilibili.com/206214/channel/collectiondetail?sid=842776"
@@ -876,5 +876,161 @@ def system_design_bulk(entries: list[SDDeckFull]):
                 row = SDDeck(slug=entry.slug)
                 session.add(row)
             _apply_sd(row, entry)
+        session.commit()
+        return {"upserted": len(entries)}
+
+
+# ===========================================================================
+# Résumés (P2·S6). PK = slug. TWO privacy tiers:
+#   • kind='base'     — the single public master résumé (public /resume page).
+#   • kind='tailored' — per-JD résumés, one per application (linked by appNum),
+#                       PRIVATE (company names) — only on the gated /full route.
+# `GET /api/resume` (public) returns ONLY the base row, so tailored résumés can
+# never leak. Bodies are text (markdown/tex); no PDF/binary here (object storage
+# deferred). Write bodies use the same camelCase (appNum) the reads return.
+# /full is declared before /{slug} so it wins the route match.
+# ===========================================================================
+class ResumeBody(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    kind: Optional[str] = None
+    app_num: Optional[int] = Field(default=None, alias="appNum")
+    company: Optional[str] = None
+    role: Optional[str] = None
+    date: Optional[str] = None
+    format: Optional[str] = None  # stored in column `fmt`
+    body: Optional[str] = None
+
+
+class ResumePatch(ResumeBody):
+    pass
+
+
+class ResumeFull(ResumeBody):
+    slug: str
+
+
+def _serialize_resume(r: Resume) -> dict:
+    return {
+        "slug": r.slug,
+        "kind": r.kind,
+        "appNum": r.app_num,
+        "company": r.company,
+        "role": r.role,
+        "date": r.date,
+        "format": r.fmt,
+        "body": r.body,
+    }
+
+
+def _apply_resume(row: Resume, body) -> None:
+    row.kind = body.kind
+    row.app_num = body.app_num
+    row.company = body.company
+    row.role = body.role
+    row.date = body.date
+    row.fmt = body.format
+    row.body = body.body
+
+
+@app.get("/api/resume")
+def resume_public():
+    """PUBLIC — the base résumé only (kind='base'). Never returns tailored résumés
+    (those carry company names). Returns null if no base résumé has been set."""
+    if SessionLocal is None:
+        return {"resume": None}
+    with SessionLocal() as session:
+        row = session.get(Resume, "base")
+        if row is None or row.kind != "base":
+            return {"resume": None}
+        return {"resume": _serialize_resume(row)}
+
+
+@app.get("/api/resume/full", dependencies=[Depends(require_admin)])
+def resume_full():
+    """PRIVATE — every résumé (base + all tailored), newest tailored first."""
+    if SessionLocal is None:
+        return {"resumes": []}
+    with SessionLocal() as session:
+        rows = session.execute(select(Resume)).scalars().all()
+        # base first, then tailored by date desc (None dates last), then slug
+        rows = sorted(
+            rows,
+            key=lambda r: (r.kind != "base", r.date is None, r.date or "", r.slug),
+            reverse=False,
+        )
+        return {"resumes": [_serialize_resume(r) for r in rows]}
+
+
+@app.get("/api/resume/{slug}", dependencies=[Depends(require_admin)])
+def resume_get(slug: str):
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(Resume, slug)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        return _serialize_resume(row)
+
+
+@app.put("/api/resume/{slug}", dependencies=[Depends(require_admin)])
+def resume_put(slug: str, body: ResumeBody):
+    """PRIVATE — create-or-replace one résumé (upsert)."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(Resume, slug)
+        created = row is None
+        if created:
+            row = Resume(slug=slug)
+            session.add(row)
+        _apply_resume(row, body)
+        session.commit()
+        session.refresh(row)
+        return {"created": created, **_serialize_resume(row)}
+
+
+@app.patch("/api/resume/{slug}", dependencies=[Depends(require_admin)])
+def resume_patch(slug: str, body: ResumePatch):
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(Resume, slug)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        data = body.model_dump(exclude_unset=True, by_alias=False)
+        if "format" in data:
+            row.fmt = data.pop("format")
+        for key, value in data.items():
+            setattr(row, key, value)
+        session.commit()
+        session.refresh(row)
+        return _serialize_resume(row)
+
+
+@app.delete("/api/resume/{slug}", dependencies=[Depends(require_admin)])
+def resume_delete(slug: str):
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(Resume, slug)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        session.delete(row)
+        session.commit()
+        return {"deleted": slug}
+
+
+@app.post("/api/resume/bulk", dependencies=[Depends(require_admin)])
+def resume_bulk(entries: list[ResumeFull]):
+    """PRIVATE — upsert an array of résumés in one call."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        for entry in entries:
+            row = session.get(Resume, entry.slug)
+            if row is None:
+                row = Resume(slug=entry.slug)
+                session.add(row)
+            _apply_resume(row, entry)
         session.commit()
         return {"upserted": len(entries)}

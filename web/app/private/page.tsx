@@ -19,6 +19,11 @@ const AREAS = [
     title: "Daily Log",
     blurb: "The full log, day by day — beyond the curated public timeline.",
   },
+  {
+    href: "/private/resume",
+    title: "Résumés",
+    blurb: "The master résumé + every tailored version, linked to its application.",
+  },
 ];
 
 export default async function PrivateHubPage() {
