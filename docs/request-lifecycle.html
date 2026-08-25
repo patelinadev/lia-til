@@ -1,0 +1,212 @@
+<title>One Request, Three Lanes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --paper:#F5F7F6; --surface:#FFFFFF; --surface-2:#EEF1F0;
+    --ink:#16211E; --ink-soft:#53625C; --ink-faint:#8B968F;
+    --line:#E1E6E3; --line-strong:#CDD5D1;
+    /* lane colors */
+    --browser:#5B6B64; --browser-bg:#ECF0EE; --browser-line:#CFD8D3;
+    --server:#0C7C6B;  --server-bg:#E2F1ED;  --server-line:#A9D9CE;   /* Vercel / Next server */
+    --data:#A5620C;    --data-bg:#F6ECDA;     --data-line:#E7CE9F;     /* FastAPI + Neon */
+    --warn:#AE3F3A;    --warn-bg:#F7E7E5;     --warn-line:#EBC3BF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#0E1512; --surface:#141C19; --surface-2:#1B2420;
+      --ink:#E7EEEB; --ink-soft:#A3AFA9; --ink-faint:#6B766F;
+      --line:#243029; --line-strong:#334037;
+      --browser:#9BA8A1; --browser-bg:#1D2622; --browser-line:#33403A;
+      --server:#4FC8B0;  --server-bg:#123029;  --server-line:#295045;
+      --data:#E0A458;    --data-bg:#2E2416;    --data-line:#52401F;
+      --warn:#E58079;    --warn-bg:#331D1B;    --warn-line:#593230;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#0E1512; --surface:#141C19; --surface-2:#1B2420;
+    --ink:#E7EEEB; --ink-soft:#A3AFA9; --ink-faint:#6B766F;
+    --line:#243029; --line-strong:#334037;
+    --browser:#9BA8A1; --browser-bg:#1D2622; --browser-line:#33403A;
+    --server:#4FC8B0;  --server-bg:#123029;  --server-line:#295045;
+    --data:#E0A458;    --data-bg:#2E2416;    --data-line:#52401F;
+    --warn:#E58079;    --warn-bg:#331D1B;    --warn-line:#593230;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif; line-height:1.6;
+    -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:760px; margin:0 auto; padding:40px 22px 90px; }
+
+  .kicker { font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--server); }
+  h1 { font-family:"Fraunces",Georgia,serif; font-weight:700; font-size:clamp(28px,5vw,40px);
+    line-height:1.05; margin:8px 0 10px; text-wrap:balance; }
+  .sub { color:var(--ink-soft); max-width:60ch; margin:0 0 26px; }
+  .sub b { color:var(--ink); }
+  code { font-family:"IBM Plex Mono",monospace; font-size:.85em; background:var(--surface-2);
+    border:1px solid var(--line); padding:1px 5px; border-radius:5px; }
+
+  /* legend */
+  .legend { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 30px; }
+  .lane-tag { display:flex; align-items:center; gap:8px; padding:7px 12px; border-radius:10px;
+    border:1px solid var(--line); background:var(--surface); font-size:13px; }
+  .dot { width:11px; height:11px; border-radius:3px; flex:none; }
+  .lane-tag b { font-weight:600; }
+  .lane-tag span { color:var(--ink-faint); font-size:12px; }
+  .d-browser{background:var(--browser);} .d-server{background:var(--server);} .d-data{background:var(--data);}
+
+  /* the spine */
+  .flow { display:flex; flex-direction:column; gap:0; }
+  .step { position:relative; display:grid; grid-template-columns:34px 1fr; gap:14px; padding-bottom:20px; }
+  .step:not(:last-child)::before { content:""; position:absolute; left:16px; top:34px; bottom:-4px;
+    width:2px; background:var(--line-strong); }
+  .num { width:34px; height:34px; border-radius:50%; display:grid; place-items:center;
+    font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:14px; z-index:1;
+    border:2px solid var(--line-strong); background:var(--surface); color:var(--ink-soft); }
+  .card { border:1px solid var(--line); border-radius:12px; padding:12px 15px; background:var(--surface); }
+  .card .lane { display:inline-flex; align-items:center; gap:6px; font-family:"IBM Plex Mono",monospace;
+    font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; font-weight:600;
+    padding:2px 8px; border-radius:999px; margin-bottom:7px; }
+  .card .act { color:var(--ink); font-size:14.5px; }
+  .card .act b { font-weight:600; }
+  .card .file { display:block; margin-top:5px; font-family:"IBM Plex Mono",monospace; font-size:11.5px;
+    color:var(--ink-faint); }
+  .card .note { display:block; margin-top:7px; font-size:12.5px; color:var(--ink-soft);
+    border-top:1px dashed var(--line-strong); padding-top:7px; }
+
+  /* lane theming for a step */
+  .browser .num { border-color:var(--browser-line); background:var(--browser-bg); color:var(--browser); }
+  .browser .card { border-color:var(--browser-line); }
+  .browser .lane { background:var(--browser-bg); color:var(--browser); }
+  .server .num { border-color:var(--server-line); background:var(--server-bg); color:var(--server); }
+  .server .card { border-color:var(--server-line); }
+  .server .lane { background:var(--server-bg); color:var(--server); }
+  .data .num { border-color:var(--data-line); background:var(--data-bg); color:var(--data); }
+  .data .card { border-color:var(--data-line); }
+  .data .lane { background:var(--data-bg); color:var(--data); }
+
+  .handoff { display:block; margin-top:7px; font-size:12px; color:var(--ink-faint); font-style:italic; }
+
+  /* branch box */
+  .branch { margin:6px 0 30px 48px; border:1px dashed var(--warn-line); background:var(--warn-bg);
+    border-radius:12px; padding:12px 15px; }
+  .branch .lane { display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10.5px;
+    letter-spacing:.05em; text-transform:uppercase; font-weight:600; color:var(--warn);
+    background:var(--surface); border:1px solid var(--warn-line); padding:2px 8px; border-radius:999px; margin-bottom:6px; }
+  .branch p { margin:0; font-size:13.5px; color:var(--ink); }
+  .branch b { font-weight:600; }
+
+  .keys { margin-top:34px; border-top:1px solid var(--line); padding-top:22px; }
+  .keys h2 { font-family:"Fraunces",serif; font-weight:600; font-size:20px; margin:0 0 12px; }
+  .keys ul { margin:0; padding-left:18px; }
+  .keys li { color:var(--ink-soft); margin:8px 0; }
+  .keys li b { color:var(--ink); }
+  .oneline { margin-top:22px; padding:16px 18px; border-radius:14px; border:1px solid var(--server-line);
+    background:var(--server-bg); }
+  .oneline p { margin:0; color:var(--ink); font-size:14.5px; }
+</style>
+
+<div class="wrap">
+  <p class="kicker">Auth request · lifecycle</p>
+  <h1>One request, three lanes</h1>
+  <p class="sub">You open <code>/private/applications</code> while logged in. Follow it top-to-bottom — the <b>color of each step tells you which machine runs it</b>. Notice that <b>every trust decision happens on a server</b>, never in your browser, and FastAPI only shows up at the very end.</p>
+
+  <div class="legend">
+    <div class="lane-tag"><span class="dot d-browser"></span><b>Browser</b> <span>your computer (client)</span></div>
+    <div class="lane-tag"><span class="dot d-server"></span><b>Vercel server</b> <span>Next.js server half</span></div>
+    <div class="lane-tag"><span class="dot d-data"></span><b>FastAPI + Neon</b> <span>Render (data backend)</span></div>
+  </div>
+
+  <div class="flow">
+
+    <div class="step browser">
+      <div class="num">1</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-browser"></span>Browser</span>
+        <div class="act">You click the corner 🔒 → the browser sends <b>GET /private/applications</b>. The <code>lt_session</code> cookie <b>rides along automatically</b> with the request.</div>
+        <span class="note">The browser only <b>sends</b> the request + later <b>displays</b> the result. It makes no decisions.</span>
+        <span class="handoff">↓ handoff to the Vercel server</span>
+      </div>
+    </div>
+
+    <div class="step server">
+      <div class="num">2</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-server"></span>Vercel server</span>
+        <div class="act">The page runs on the server as a <b>Server Component</b>. First line: <code>await requireAdmin()</code>.</div>
+        <span class="file">app/private/applications/page.tsx · lib/auth.ts</span>
+      </div>
+    </div>
+
+    <div class="step server">
+      <div class="num">3</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-server"></span>Vercel server</span>
+        <div class="act"><code>getSession()</code> reads the cookie and <b>verifies the JWT signature</b> with <code>AUTH_SECRET</code>. Valid → it's you. ✓</div>
+        <span class="file">lib/session.ts · jose jwtVerify (HS256)</span>
+        <span class="note"><code>AUTH_SECRET</code> lives <b>only here</b>, on the server — so the browser can't forge the cookie. <b>This is the whole security.</b></span>
+      </div>
+    </div>
+
+    <div class="step server">
+      <div class="num">4</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-server"></span>Vercel server</span>
+        <div class="act">Session ok → fetch the real data: <code>getFullApplications()</code> calls FastAPI, sending the header <code>x-admin-secret: BACKEND_SECRET</code>.</div>
+        <span class="file">lib/private.ts · server-to-server fetch</span>
+        <span class="note"><code>BACKEND_SECRET</code> travels <b>server → server only</b>. It never touches the browser.</span>
+        <span class="handoff">↓ now — and only now — FastAPI is involved</span>
+      </div>
+    </div>
+
+    <div class="step data">
+      <div class="num">5</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-data"></span>FastAPI + Neon</span>
+        <div class="act"><code>require_admin</code> checks the secret matches → queries the <b>Neon database</b> → returns the full rows as JSON.</div>
+        <span class="file">backend/main.py · /api/applications/full</span>
+        <span class="note">Fail-closed: wrong/absent secret → <code>401</code>, no data leaves.</span>
+        <span class="handoff">↑ JSON back to the Vercel server</span>
+      </div>
+    </div>
+
+    <div class="step server">
+      <div class="num">6</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-server"></span>Vercel server</span>
+        <div class="act">The server builds the finished <b>HTML</b> with the data baked in, and sends it to the browser.</div>
+      </div>
+    </div>
+
+    <div class="step browser">
+      <div class="num">7</div>
+      <div class="card">
+        <span class="lane"><span class="dot d-browser"></span>Browser</span>
+        <div class="act">The browser <b>displays</b> the page. Interactive bits (the <code>ApplicationsExplorer</code> — a <b>Client Component</b>) then "hydrate" so filtering/sorting works.</div>
+        <span class="note">Only now does code run in the browser — and it's just UI, never the auth check.</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="branch">
+    <span class="lane">Branch · not logged in (incognito)</span>
+    <p>At <b>step 3</b>, an incognito window has <b>no cookie</b> → <code>getSession()</code> returns <code>null</code> → <code>requireAdmin()</code> does <code>redirect("/api/auth/login")</code> → the browser is bounced to GitHub. <b>Steps 4–7 never run; FastAPI and the database are never touched.</b> The private data never left the server.</p>
+  </div>
+
+  <div class="keys">
+    <h2>The three things to remember</h2>
+    <ul>
+      <li><b>Color = machine.</b> Green steps run on the Vercel server (Next's server half), grey on your browser, amber on FastAPI. "It's in the <code>web/</code> project" doesn't mean "it runs in the browser."</li>
+      <li><b>Secrets never reach the browser.</b> <code>AUTH_SECRET</code> (verifies the cookie) and <code>BACKEND_SECRET</code> (opens the data endpoint) both live server-side only. That's why tampering with the cookie fails.</li>
+      <li><b>FastAPI is the last lane, and optional.</b> The whole auth check finishes on the Vercel server; the data backend is only reached <em>after</em> you're verified — and skipped entirely if you're not.</li>
+    </ul>
+    <div class="oneline">
+      <p><b>One line:</b> browser <b>asks</b> → Vercel server <b>decides who you are</b> (cookie + <code>AUTH_SECRET</code>) → Vercel server <b>fetches data</b> from FastAPI (with <code>BACKEND_SECRET</code>) → browser <b>shows</b> the result. Trust always lives on a server.</p>
+    </div>
+  </div>
+</div>
