@@ -52,9 +52,9 @@ export default async function PrivateDayPage({ params }: { params: Promise<{ dat
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
       {back}
 
-      <DayNav older={older} newer={newer} className="mt-4" />
+      <DaySideNav older={older} newer={newer} />
 
-      <div className="mt-4 mb-2 flex flex-wrap items-baseline justify-between gap-3">
+      <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="font-mono text-2xl font-bold sm:text-3xl">{e.date}</h1>
         {e.week && <span className="font-mono text-sm text-neutral-400">{e.week}</span>}
       </div>
@@ -106,35 +106,38 @@ export default async function PrivateDayPage({ params }: { params: Promise<{ dat
       ) : (
         <p className="mt-6 text-sm text-neutral-400">No sections recorded for this day.</p>
       )}
-
-      <DayNav older={older} newer={newer} className="mt-8 border-t border-neutral-200 pt-5 dark:border-neutral-800" />
     </main>
   );
 }
 
-/** Prev (older) / next (newer) day links — moves between logged days only. */
-function DayNav({ older, newer, className = "" }: { older?: string; newer?: string; className?: string }) {
-  const link =
-    "inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-1.5 text-sm text-neutral-600 transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:text-neutral-400";
+/**
+ * Fixed vertical day-pager pinned to the right edge:
+ *   ↑ = next day (newer) · ↓ = previous day (older).
+ * Moves between logged days only; ends are shown disabled.
+ */
+function DaySideNav({ older, newer }: { older?: string; newer?: string }) {
+  const btn =
+    "flex h-11 w-11 items-center justify-center text-xl text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100";
+  const off = "flex h-11 w-11 items-center justify-center text-xl text-neutral-300 dark:text-neutral-700";
   return (
-    <nav className={`flex items-center justify-between gap-3 ${className}`}>
-      {older ? (
-        <Link href={`/private/daily-log/${older}`} className={link}>
-          <span aria-hidden>&larr;</span>
-          <span className="font-mono text-xs">{older}</span>
-          <span className="text-neutral-400">prev day</span>
-        </Link>
-      ) : (
-        <span className="text-xs text-neutral-300 dark:text-neutral-600">&larr; earliest</span>
-      )}
+    <nav
+      aria-label="Adjacent days"
+      className="fixed right-3 top-1/2 z-30 flex -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white/90 shadow-sm backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/90"
+    >
       {newer ? (
-        <Link href={`/private/daily-log/${newer}`} className={link}>
-          <span className="text-neutral-400">next day</span>
-          <span className="font-mono text-xs">{newer}</span>
-          <span aria-hidden>&rarr;</span>
+        <Link href={`/private/daily-log/${newer}`} className={btn} title={`Next day · ${newer}`} aria-label={`Next day ${newer}`}>
+          &uarr;
         </Link>
       ) : (
-        <span className="text-xs text-neutral-300 dark:text-neutral-600">latest &rarr;</span>
+        <span className={off} title="Latest — no newer day" aria-hidden>&uarr;</span>
+      )}
+      <span className="mx-2 h-px bg-neutral-200 dark:bg-neutral-800" />
+      {older ? (
+        <Link href={`/private/daily-log/${older}`} className={btn} title={`Previous day · ${older}`} aria-label={`Previous day ${older}`}>
+          &darr;
+        </Link>
+      ) : (
+        <span className={off} title="Earliest — no older day" aria-hidden>&darr;</span>
       )}
     </nav>
   );
