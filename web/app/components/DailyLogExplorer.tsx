@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fuzzyMatch } from "@/lib/content";
-import { realSections, allTags, autoTags } from "@/lib/daily";
+import { realSections } from "@/lib/daily";
 import TagChips from "@/app/components/TagChips";
 
 export type DailyEntry = {
@@ -23,7 +23,7 @@ const DOW = ["M", "T", "W", "T", "F", "S", "S"];
 
 function searchBlob(e: DailyEntry): string {
   const parts: (string | null | undefined)[] = [e.date, e.week, e.summary, e.note, ...e.done];
-  parts.push(...allTags(e.tags, e.sections));
+  parts.push(...(e.tags ?? []));
   for (const p of e.leetcode ?? []) parts.push(`LC ${p.id} ${p.title ?? ""}`);
   for (const [k, v] of realSections(e.sections)) parts.push(`${k} ${v}`);
   return parts.filter(Boolean).join(" ");
@@ -243,7 +243,7 @@ function PrivateDayCard({ e }: { e: DailyEntry }) {
         <span className="flex items-center gap-2 font-mono text-xs text-neutral-400">{e.week}<span className="transition-transform group-hover:translate-x-0.5">→</span></span>
       </div>
       {e.summary ? <p className="mt-1.5 text-sm text-neutral-700 dark:text-neutral-300">{e.summary}</p> : <p className="mt-1.5 text-sm italic text-neutral-400">no summary yet</p>}
-      <TagChips tags={allTags(e.tags, e.sections)} auto={autoTags(e.sections)} className="mt-2" />
+      <TagChips tags={e.tags} className="mt-2" />
       <div className="mt-2 flex flex-wrap gap-1.5 font-mono text-[11px] text-neutral-500">
         {secN > 0 && <span className="rounded bg-neutral-100 px-1.5 py-0.5 dark:bg-neutral-900">{secN} sections</span>}
         {e.done.length > 0 && <span className="rounded bg-neutral-100 px-1.5 py-0.5 dark:bg-neutral-900">{e.done.length} done</span>}
@@ -263,7 +263,7 @@ function PublicDayCard({ e }: { e: DailyEntry }) {
         {e.week && <span className="font-mono text-xs text-neutral-400">{e.week}</span>}
       </div>
       {e.summary && <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">{e.summary}</p>}
-      <TagChips tags={allTags(e.tags, e.sections)} auto={autoTags(e.sections)} className="mt-2" />
+      <TagChips tags={e.tags} className="mt-2" />
       {e.done.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-2">
           {e.done.map((item) => (<li key={item} className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-900">&#10003; {item}</li>))}

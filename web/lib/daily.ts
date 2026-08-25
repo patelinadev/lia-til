@@ -34,19 +34,3 @@ export function realSections(
     ([k, v]) => k !== "_preamble" && sectionHasContent(v),
   );
 }
-
-/** Tags derived automatically from a day's content (e.g. "code" when any
- * section has a fenced code block). Merged with the manual tags for display. */
-export function autoTags(sections?: Record<string, string> | null): string[] {
-  const out: string[] = [];
-  if (sections && Object.values(sections).some((v) => v && v.includes("```"))) out.push("code");
-  return out;
-}
-
-/** Manual tags + auto tags, de-duplicated. */
-export function allTags(
-  tags?: string[] | null,
-  sections?: Record<string, string> | null,
-): string[] {
-  return [...new Set([...(tags ?? []), ...autoTags(sections)])];
-}

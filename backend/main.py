@@ -6,6 +6,7 @@ Private full views come later behind auth (S2).
 """
 
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import date as date_type
 from typing import Optional
@@ -203,6 +204,63 @@ def system_design():
     return {"decks": decks}
 
 
+_LC = re.compile(r"\blc\s*\d+", re.I)
+
+
+def _section_has_content(md) -> bool:
+    for raw in (md or "").split("\n"):
+        line = raw.strip()
+        if not line or re.match(r"^#{1,6}\s", line):
+            continue
+        s = re.sub(r"^[-*]\s*\[[ xX]\]\s*", "", line)
+        s = re.sub(r"^[-*]\s+", "", s)
+        if s.strip() and s.strip() != "-":
+            return True
+    return False
+
+
+def _auto_tags(sections: Optional[dict]) -> list[str]:
+    """Rule-based tier-1 tags derived from a day's content (see the taxonomy)."""
+    if not sections:
+        return []
+    tags = set()
+    for k, v in sections.items():
+        if k == "_preamble" or not _section_has_content(v):
+            continue
+        kl = k.lower()
+        if "interview" in kl:
+            tags.add("interview")
+        if "oral english" in kl or "口语" in k:
+            tags.add("oral-english")
+        if "success diary" in kl or "日记" in k:
+            tags.add("mindset")
+        if "```" in (v or ""):
+            tags.add("code")
+    content = " ".join(v for k, v in sections.items() if k != "_preamble" and _section_has_content(v))
+    cl = content.lower()
+    if _LC.search(content) or "leetcode" in cl or "0x3f" in cl or any(
+        x in content for x in ("刷题", "滑动窗口", "双指针", "哈希表", "二分", "回溯", "动态规划", "链表", "单调栈")
+    ):
+        tags.add("leetcode")
+    if "system design" in cl or "系统设计" in content or "dns" in cl or "rate limit" in cl or any(
+        x in content for x in ("负载均衡", "一致性哈希", "限流", "缓存层")
+    ):
+        tags.add("system-design")
+    if "简历" in content or "resume" in cl or "bullet" in cl:
+        tags.add("resume")
+    if "择导" in content or "advisor" in cl or "faculty" in cl or "导师" in content or re.search(r"\bph\.?d", cl):
+        tags.add("phd-advisor")
+    if "投递" in content or "投简历" in content or "申请" in content or "application" in cl:
+        tags.add("applications")
+    return sorted(tags)
+
+
+def _tags_for(row: DailyLog) -> list[str]:
+    """Manual tags + rule-based auto tags, de-duplicated & sorted. Served on both
+    public and private (tags are topic labels, never the private content)."""
+    return sorted(set((row.tags or []) + _auto_tags(row.sections)))
+
+
 def _daily_log_entries(include_sections: bool = False):
     """Daily-log entries newest-first, LeetCode items enriched with their solution
     URL from the leetcode table (single source). `include_sections` adds the full
@@ -226,7 +284,7 @@ def _daily_log_entries(include_sections: bool = False):
                 "done": r.done or [],
                 "summary": r.summary,
                 "note": r.note,
-                "tags": r.tags or [],
+                "tags": _tags_for(r),
                 "leetcode": [
                     {**item, "solutionUrl": sol.get(item.get("id"))} for item in (r.leetcode or [])
                 ],
@@ -277,7 +335,7 @@ def _serialize_daily(row: DailyLog) -> dict:
         "note": row.note,
         "leetcode": row.leetcode or [],
         "sections": row.sections or {},
-        "tags": row.tags or [],
+        "tags": _tags_for(row),
     }
 
 

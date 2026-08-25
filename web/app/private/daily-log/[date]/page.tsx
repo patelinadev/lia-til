@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { getFullDailyLog } from "@/lib/private";
-import { realSections, allTags, autoTags } from "@/lib/daily";
+import { realSections } from "@/lib/daily";
 import SectionBody from "@/app/components/SectionBody";
 import DataError from "@/app/components/DataError";
 import TagChips from "@/app/components/TagChips";
@@ -61,7 +61,7 @@ export default async function PrivateDayPage({ params }: { params: Promise<{ dat
       </div>
       {e.summary && <p className="mt-1 text-neutral-700 dark:text-neutral-300">{e.summary}</p>}
 
-      <TagChips tags={allTags(e.tags, e.sections)} auto={autoTags(e.sections)} className="mb-6 mt-3" />
+      <TagChips tags={e.tags} className="mb-6 mt-3" />
 
       {/* curated fields */}
       {e.done.length > 0 && (

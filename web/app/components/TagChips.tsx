@@ -1,27 +1,13 @@
-/** Topic/type tag chips. Auto-derived tags (e.g. "code") render muted; manual
- * tags render in the accent color. Works in server and client components. */
-export default function TagChips({
-  tags,
-  auto = [],
-  className = "",
-}: {
-  tags: string[];
-  auto?: string[];
-  className?: string;
-}) {
-  if (tags.length === 0) return null;
-  const autoSet = new Set(auto);
+/** Topic/type tag chips. Tags (manual + rule-derived) are merged by the backend
+ * and served on both public and private, so this just renders the list. */
+export default function TagChips({ tags, className = "" }: { tags?: string[] | null; className?: string }) {
+  if (!tags || tags.length === 0) return null;
   return (
     <div className={`flex flex-wrap gap-1.5 ${className}`}>
       {tags.map((t) => (
         <span
           key={t}
-          title={autoSet.has(t) ? "auto-derived tag" : undefined}
-          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-            autoSet.has(t)
-              ? "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
-              : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
-          }`}
+          className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
         >
           #{t}
         </span>
