@@ -8,6 +8,7 @@ export const metadata = {
 const REASONS: Record<string, string> = {
   not_allowed: "That GitHub account isn't the owner of this site, so the private view stays locked.",
   state: "The sign-in request expired or didn't match. Please try again.",
+  github: "Couldn't reach GitHub cleanly just now — a transient hiccup, not a rejection. Please try signing in again.",
   token: "GitHub didn't return a valid token. Please try again.",
   config: "Sign-in isn't fully configured yet.",
 };
