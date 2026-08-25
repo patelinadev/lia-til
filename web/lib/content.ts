@@ -57,6 +57,8 @@ export type LogEntry = {
   date: string;
   /** ISO week label, e.g. "W34" */
   week: string;
+  /** Topic / type labels for categorization + search, e.g. ["code", "system-design"] */
+  tags?: string[];
   /** Checked-off items for the day */
   done: string[];
   /** One-line completion summary (may be 中英混杂 — daily-log notes are not forced to English); null if none */

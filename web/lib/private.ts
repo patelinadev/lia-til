@@ -38,6 +38,8 @@ export type FullDailyLogEntry = {
   /** The full faithful record from the vault ({heading -> content}), including
    * the private sections. Served ONLY by the gated /full endpoint. */
   sections?: Record<string, string> | null;
+  /** Topic / type labels for categorization + search. */
+  tags?: string[] | null;
 };
 
 /** Fetch the full daily log from the backend's private endpoint (secret-gated).

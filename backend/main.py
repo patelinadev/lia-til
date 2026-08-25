@@ -43,6 +43,7 @@ class DailyLogIn(BaseModel):
     note: Optional[str] = None
     leetcode: list[dict] = Field(default_factory=list)
     sections: Optional[dict] = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class DailyLogPatch(BaseModel):
@@ -53,6 +54,7 @@ class DailyLogPatch(BaseModel):
     note: Optional[str] = None
     leetcode: Optional[list[dict]] = None
     sections: Optional[dict] = None
+    tags: Optional[list[str]] = None
 
 
 class DailyLogFull(DailyLogIn):
@@ -68,11 +70,12 @@ async def lifespan(_app: FastAPI):
         # Lightweight migration: create_all never ALTERs an existing table, so add
         # the daily_logs.sections column if it's missing. Idempotent; best-effort
         # (a fresh SQLite table already has it, so the ALTER is skipped/ignored).
-        try:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS sections JSON"))
-        except Exception:
-            pass
+        for col in ("sections JSON", "tags JSON"):
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS {col}"))
+            except Exception:
+                pass
     yield
 
 
@@ -223,6 +226,7 @@ def _daily_log_entries(include_sections: bool = False):
                 "done": r.done or [],
                 "summary": r.summary,
                 "note": r.note,
+                "tags": r.tags or [],
                 "leetcode": [
                     {**item, "solutionUrl": sol.get(item.get("id"))} for item in (r.leetcode or [])
                 ],
@@ -273,6 +277,7 @@ def _serialize_daily(row: DailyLog) -> dict:
         "note": row.note,
         "leetcode": row.leetcode or [],
         "sections": row.sections or {},
+        "tags": row.tags or [],
     }
 
 
@@ -283,6 +288,7 @@ def _apply_full(row: DailyLog, body: DailyLogIn) -> None:
     row.note = body.note
     row.leetcode = body.leetcode
     row.sections = body.sections
+    row.tags = body.tags
 
 
 @app.get("/api/daily-log/{date}", dependencies=[Depends(require_admin)])
