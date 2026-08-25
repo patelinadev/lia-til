@@ -182,7 +182,7 @@
   .fstep { display: grid; grid-template-columns: 30px 1fr; gap: 12px; }
   .fstep .sd { font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 12px; color: var(--surface); background: var(--accent); width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center; }
   .fstep.ext .sd { background: var(--pick); }
-  .fstep .fb { border: 1px solid var(--line); border-radius: 10px; padding: 9px 13px; background: var(--surface); }
+  .fstep .fbx { border: 1px solid var(--line); border-radius: 10px; padding: 9px 13px; background: var(--surface); }
   .fstep .who { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); }
   .fstep.ext .who { color: var(--pick); }
   .fstep .txt { font-size: 13.5px; color: var(--ink); }
@@ -602,16 +602,16 @@
 
       <div class="diagram" aria-label="OAuth authorization-code flow">
         <div class="flow">
-          <div class="fstep"><span class="sd">1</span><div class="fb"><span class="who">you · any page</span><div class="txt">Click the corner <code>🔒</code> → go to <code>/private</code>.</div></div></div>
-          <div class="fstep"><span class="sd">2</span><div class="fb"><span class="who">code · app/private/page.tsx</span><div class="txt"><code>requireAdmin()</code> finds no session → <code>redirect("/api/auth/login")</code>.</div></div></div>
-          <div class="fstep"><span class="sd">3</span><div class="fb"><span class="who">code · api/auth/login</span><div class="txt">Set a random <b>CSRF state</b> cookie, then redirect to GitHub's authorize URL with <code>client_id</code> + <code>state</code> + <code>scope=read:user</code>.</div></div></div>
-          <div class="fstep ext"><span class="sd">4</span><div class="fb"><span class="who">github.com</span><div class="txt">GitHub verifies <b>you</b> (password, <b>the SMS</b>) and shows "Authorize lia-til?". You click yes.</div></div></div>
-          <div class="fstep ext"><span class="sd">5</span><div class="fb"><span class="who">github.com</span><div class="txt">GitHub redirects back to <code>/api/auth/callback?code=…&amp;state=…</code>. The <code>code</code> is a one-time voucher.</div></div></div>
-          <div class="fstep"><span class="sd">6</span><div class="fb"><span class="who">code · api/auth/callback</span><div class="txt">Check <code>state</code> matches the cookie (anti-CSRF). Then POST the <code>code</code> + <code>client_secret</code> to GitHub → get an <b>access token</b>.</div></div></div>
-          <div class="fstep"><span class="sd">7</span><div class="fb"><span class="who">code → github api</span><div class="txt">Use the token: <code>GET api.github.com/user</code> → <code>{ login: "patelinadev", … }</code>.</div></div></div>
-          <div class="fstep"><span class="sd">8</span><div class="fb"><span class="who">code · the allowlist</span><div class="txt">Is <code>login === ALLOWED_GITHUB_LOGIN</code>? If no → <code>/private/denied</code>. If yes → continue.</div></div></div>
-          <div class="fstep"><span class="sd">9</span><div class="fb"><span class="who">code · lib/session.ts</span><div class="txt"><code>createSession()</code> signs a <b>JWT</b> with your login and drops it in an HttpOnly cookie. Redirect to <code>/private</code>.</div></div></div>
-          <div class="fstep"><span class="sd">10</span><div class="fb"><span class="who">code · app/private/page.tsx</span><div class="txt">This time <code>requireAdmin()</code> finds a valid session → renders the page. Done.</div></div></div>
+          <div class="fstep"><span class="sd">1</span><div class="fbx"><span class="who">you · any page</span><div class="txt">Click the corner <code>🔒</code> → go to <code>/private</code>.</div></div></div>
+          <div class="fstep"><span class="sd">2</span><div class="fbx"><span class="who">code · app/private/page.tsx</span><div class="txt"><code>requireAdmin()</code> finds no session → <code>redirect("/api/auth/login")</code>.</div></div></div>
+          <div class="fstep"><span class="sd">3</span><div class="fbx"><span class="who">code · api/auth/login</span><div class="txt">Set a random <b>CSRF state</b> cookie, then redirect to GitHub's authorize URL with <code>client_id</code> + <code>state</code> + <code>scope=read:user</code>.</div></div></div>
+          <div class="fstep ext"><span class="sd">4</span><div class="fbx"><span class="who">github.com</span><div class="txt">GitHub verifies <b>you</b> (password, <b>the SMS</b>) and shows "Authorize lia-til?". You click yes.</div></div></div>
+          <div class="fstep ext"><span class="sd">5</span><div class="fbx"><span class="who">github.com</span><div class="txt">GitHub redirects back to <code>/api/auth/callback?code=…&amp;state=…</code>. The <code>code</code> is a one-time voucher.</div></div></div>
+          <div class="fstep"><span class="sd">6</span><div class="fbx"><span class="who">code · api/auth/callback</span><div class="txt">Check <code>state</code> matches the cookie (anti-CSRF). Then POST the <code>code</code> + <code>client_secret</code> to GitHub → get an <b>access token</b>.</div></div></div>
+          <div class="fstep"><span class="sd">7</span><div class="fbx"><span class="who">code → github api</span><div class="txt">Use the token: <code>GET api.github.com/user</code> → <code>{ login: "patelinadev", … }</code>.</div></div></div>
+          <div class="fstep"><span class="sd">8</span><div class="fbx"><span class="who">code · the allowlist</span><div class="txt">Is <code>login === ALLOWED_GITHUB_LOGIN</code>? If no → <code>/private/denied</code>. If yes → continue.</div></div></div>
+          <div class="fstep"><span class="sd">9</span><div class="fbx"><span class="who">code · lib/session.ts</span><div class="txt"><code>createSession()</code> signs a <b>JWT</b> with your login and drops it in an HttpOnly cookie. Redirect to <code>/private</code>.</div></div></div>
+          <div class="fstep"><span class="sd">10</span><div class="fbx"><span class="who">code · app/private/page.tsx</span><div class="txt">This time <code>requireAdmin()</code> finds a valid session → renders the page. Done.</div></div></div>
         </div>
       </div>
 
