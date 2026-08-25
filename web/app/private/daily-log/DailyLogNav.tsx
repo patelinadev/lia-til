@@ -251,6 +251,32 @@ export default function DailyLogNav({ entries }: { entries: FullDailyLogEntry[] 
                     📝 {e.note}
                   </p>
                 )}
+
+                {e.sections &&
+                  Object.entries(e.sections).filter(([k]) => k !== "_preamble").length > 0 && (
+                    <div className="mt-4 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+                      <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-neutral-400">
+                        Full record · private
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        {Object.entries(e.sections)
+                          .filter(([k]) => k !== "_preamble")
+                          .map(([heading, content]) => (
+                            <details
+                              key={heading}
+                              className="rounded-lg bg-neutral-50 px-3 py-2 dark:bg-neutral-900/50"
+                            >
+                              <summary className="cursor-pointer select-none text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                {heading}
+                              </summary>
+                              <pre className="mt-2 whitespace-pre-wrap break-words font-sans text-[13px] leading-relaxed text-neutral-600 dark:text-neutral-400">
+                                {content || "—"}
+                              </pre>
+                            </details>
+                          ))}
+                      </div>
+                    </div>
+                  )}
               </article>
             </div>
           );
