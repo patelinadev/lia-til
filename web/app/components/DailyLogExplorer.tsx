@@ -2,9 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { fuzzyMatch } from "@/lib/content";
-import { realSections } from "@/lib/daily";
+import { useRouter, useSearchParams } from "next/navigation";
+import { realSections, filterEntries, filterToQuery, parseFilter } from "@/lib/daily";
 import TagChips from "@/app/components/TagChips";
 
 export type DailyEntry = {
@@ -21,14 +20,6 @@ export type DailyEntry = {
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DOW = ["M", "T", "W", "T", "F", "S", "S"];
 
-function searchBlob(e: DailyEntry): string {
-  const parts: (string | null | undefined)[] = [e.date, e.week, e.summary, e.note, ...e.done];
-  parts.push(...(e.tags ?? []));
-  for (const p of e.leetcode ?? []) parts.push(`LC ${p.id} ${p.title ?? ""}`);
-  for (const [k, v] of realSections(e.sections)) parts.push(`${k} ${v}`);
-  return parts.filter(Boolean).join(" ");
-}
-
 export default function DailyLogExplorer({
   entries,
   variant,
@@ -37,16 +28,23 @@ export default function DailyLogExplorer({
   variant: "public" | "private";
 }) {
   const router = useRouter();
-  const [q, setQ] = useState("");
+  const searchParams = useSearchParams();
+  const init = parseFilter(searchParams);
+  const [q, setQ] = useState(init.q);
   const [railOpen, setRailOpen] = useState(true);
-  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(init.tin.length + init.tex.length > 0);
   // tri-state per tag: "in" = only days with it, "ex" = hide days with it
-  const [tagState, setTagState] = useState<Map<string, "in" | "ex">>(new Map());
+  const [tagState, setTagState] = useState<Map<string, "in" | "ex">>(() => {
+    const m = new Map<string, "in" | "ex">();
+    init.tin.forEach((t) => m.set(t, "in"));
+    init.tex.forEach((t) => m.set(t, "ex"));
+    return m;
+  });
 
   // one active filter at a time — week OR month OR day — so they can't conflict
-  const [week, setWeek] = useState("");
-  const [monthKey, setMonthKey] = useState(""); // "YYYY-MM"
-  const [day, setDay] = useState(""); // "YYYY-MM-DD" (public only)
+  const [week, setWeek] = useState(init.week);
+  const [monthKey, setMonthKey] = useState(init.month); // "YYYY-MM"
+  const [day, setDay] = useState(init.day); // "YYYY-MM-DD" (public only)
 
   // calendar popover state
   const [calOpen, setCalOpen] = useState(false);
@@ -86,20 +84,15 @@ export default function DailyLogExplorer({
     return [...s].sort();
   }, [entries]);
 
+  const tin = useMemo(() => [...tagState].filter(([, s]) => s === "in").map(([t]) => t), [tagState]);
+  const tex = useMemo(() => [...tagState].filter(([, s]) => s === "ex").map(([t]) => t), [tagState]);
+  // the current filter, serialized — carried into day links so the per-day pager
+  // and the "back" link keep the same filter (persistence + filtered prev/next).
+  const query = filterToQuery({ q, week, month: monthKey, day, tin, tex });
+
   const filtered = useMemo(
-    () =>
-      entries.filter((e) => {
-        if (week && e.week !== week) return false;
-        if (monthKey && e.date.slice(0, 7) !== monthKey) return false;
-        if (day && e.date !== day) return false;
-        for (const [t, st] of tagState) {
-          const has = (e.tags ?? []).includes(t);
-          if (st === "in" && !has) return false; // must have it
-          if (st === "ex" && has) return false; // must NOT have it
-        }
-        return fuzzyMatch(q, searchBlob(e));
-      }),
-    [entries, q, week, monthKey, day, tagState],
+    () => filterEntries(entries, { q, week, month: monthKey, day, tin, tex }),
+    [entries, q, week, monthKey, day, tin, tex],
   );
 
   // week-marker dates (first entry of each week, top-down) — the vertical timeline
@@ -116,7 +109,7 @@ export default function DailyLogExplorer({
   const pickMonth = (y: number, m: number) => { setMonthKey(`${y}-${String(m).padStart(2, "0")}`); setWeek(""); setDay(""); setCalMonth(m); };
   const pickDay = (iso: string) => {
     setCalOpen(false);
-    if (variant === "private") router.push(`/private/daily-log/${iso}`);
+    if (variant === "private") router.push(`/private/daily-log/${iso}${query}`);
     else { setDay(iso); setWeek(""); setMonthKey(""); }
   };
 
@@ -271,7 +264,7 @@ export default function DailyLogExplorer({
               {weekMarks.has(e.date) && e.week && (
                 <p className="mb-1.5 mt-1 px-0.5 font-mono text-xs tracking-wide text-neutral-400">{e.date.slice(0, 4)} · {e.week}</p>
               )}
-              {variant === "private" ? <PrivateDayCard e={e} /> : <PublicDayCard e={e} />}
+              {variant === "private" ? <PrivateDayCard e={e} query={query} /> : <PublicDayCard e={e} />}
             </div>
           ))}
         </div>
@@ -301,11 +294,11 @@ function MiniCal({ year, month, days, onPick }: { year: number; month: number; d
 }
 
 /** Private: a compact card linking to the day's own page (the full record is long). */
-function PrivateDayCard({ e }: { e: DailyEntry }) {
+function PrivateDayCard({ e, query }: { e: DailyEntry; query: string }) {
   const secN = realSections(e.sections).length;
   const lcN = e.leetcode?.length ?? 0;
   return (
-    <Link href={`/private/daily-log/${e.date}`} className="group block rounded-xl border border-neutral-200 p-4 transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600">
+    <Link href={`/private/daily-log/${e.date}${query}`} className="group block rounded-xl border border-neutral-200 p-4 transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600">
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-mono text-sm font-semibold">{e.date}</span>
         <span className="flex items-center gap-2 font-mono text-xs text-neutral-400">{e.week}<span className="transition-transform group-hover:translate-x-0.5">→</span></span>
