@@ -56,3 +56,22 @@ export async function getFullDailyLog(): Promise<FullDailyLogEntry[] | null> {
   if (!data) return null;
   return data.entries ?? [];
 }
+
+export type SiteIndex = { value: string; updatedAt: string | null };
+
+/** Fetch the private INDEX / TL;DR navigator (secret-gated) — a single rolling
+ * markdown "table of contents". PRIVATE: served only behind the admin secret and
+ * never rendered on any public page. Returns `null` when the backend can't be
+ * reached (transient cold start); a present object with `value: ""` means the
+ * doc has simply never been written yet. */
+export async function getIndex(): Promise<SiteIndex | null> {
+  const base = process.env.API_URL?.replace(/\/$/, "");
+  const secret = process.env.BACKEND_SECRET;
+  if (!base || !secret) return null;
+  const data = await fetchJsonWithRetry<{ value: string; updatedAt: string | null }>(
+    `${base}/api/index`,
+    { headers: { "x-admin-secret": secret } },
+  );
+  if (!data) return null;
+  return { value: data.value ?? "", updatedAt: data.updatedAt ?? null };
+}
