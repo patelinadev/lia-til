@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PHASES, reviewedMap, deckSlug } from "./decks";
 import { getDecks } from "./data";
+import DataError from "@/app/components/DataError";
 
 export const metadata = {
   title: "System Design · Lia's Learning Progress",
@@ -8,9 +9,27 @@ export const metadata = {
 
 // Render at request time so newly-imported decks show up without a rebuild.
 export const dynamic = "force-dynamic";
+// Allow the request to wait out a cold backend start (Render free tier ~40s).
+export const maxDuration = 60;
 
 export default async function SystemDesignPage() {
   const decks = await getDecks();
+
+  if (!decks) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-6 py-12 sm:py-16">
+        <Link
+          href="/"
+          className="text-sm text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-300"
+        >
+          &larr; Learning Progress
+        </Link>
+        <h1 className="mt-6 text-3xl font-bold sm:text-4xl">System Design</h1>
+        <DataError label="the System Design decks" />
+      </main>
+    );
+  }
+
   const REVIEWED = reviewedMap(decks);
   const doneCount = Object.keys(REVIEWED).length;
   const total = PHASES.reduce((n, p) => n + p.decks.length, 0);

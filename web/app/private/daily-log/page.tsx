@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { getFullDailyLog } from "@/lib/private";
-import { getLeetcode } from "@/lib/content.server";
 import DailyLogNav from "./DailyLogNav";
 
 export const metadata = {
@@ -16,14 +15,8 @@ export const maxDuration = 60;
 export default async function PrivateDailyLogPage() {
   await requireAdmin();
   const entries = await getFullDailyLog();
-
-  // Solution links are single-source: a problem's solutionUrl lives in the
-  // LeetCode data and is resolved here by id, so the private log stays in sync
-  // with the public /daily-log and the /leetcode table from one edit.
-  const solutions: Record<number, string> = {};
-  for (const p of getLeetcode().problems) {
-    if (p.solutionUrl) solutions[p.id] = p.solutionUrl;
-  }
+  // Solution links come already enriched (by id) from GET /api/daily-log/full,
+  // so nothing local is needed here.
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
@@ -56,7 +49,7 @@ export default async function PrivateDailyLogPage() {
           The log is empty — no entries have been imported yet.
         </p>
       ) : (
-        <DailyLogNav entries={entries} solutions={solutions} />
+        <DailyLogNav entries={entries} />
       )}
     </main>
   );

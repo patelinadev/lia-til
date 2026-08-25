@@ -1,8 +1,8 @@
 import Link from "next/link";
 import Reveal from "@/app/components/Reveal";
-import { getLog, getLeetcode } from "@/lib/content.server";
 import type { LogEntry } from "@/lib/content";
 import { fetchJsonWithRetry } from "@/lib/net";
+import DataError from "@/app/components/DataError";
 
 export const metadata = {
   title: "Daily Log · Lia's Learning Progress",
@@ -18,25 +18,32 @@ function formatDate(iso: string): string {
   return `${m}/${d}/${y}`;
 }
 
-/** Fetch curated daily-log entries from the backend at request time; fall back
- * to the committed files only if API_URL is unset or the API stays unreachable
- * through the retry budget (so a cold start no longer drops us to the snapshot). */
-async function getDailyLog(): Promise<LogEntry[]> {
+/** Fetch curated daily-log entries from the backend at request time. Returns
+ * null if the API is unset/unreachable — the page then shows an error state.
+ * LeetCode solution links come already enriched (by id) from the endpoint. */
+async function getDailyLog(): Promise<LogEntry[] | null> {
   const base = process.env.API_URL?.replace(/\/$/, "");
-  if (base) {
-    const data = await fetchJsonWithRetry<LogEntry[]>(`${base}/api/daily-log`);
-    if (data) return data;
-  }
-  return getLog();
+  if (!base) return null;
+  return fetchJsonWithRetry<LogEntry[]>(`${base}/api/daily-log`);
 }
 
 export default async function DailyLogPage() {
   const log = await getDailyLog();
-  // Single source for solution links: look them up from leetcode.json by id,
-  // so adding a solution there auto-fills the daily log too.
-  const solutionById = new Map(
-    getLeetcode().problems.map((p) => [p.id, p.solutionUrl] as const),
-  );
+
+  if (!log) {
+    return (
+      <main className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-16">
+        <Link
+          href="/"
+          className="text-sm text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-300"
+        >
+          &larr; Learning Progress
+        </Link>
+        <h1 className="mt-6 text-3xl font-bold sm:text-4xl">Daily Log</h1>
+        <DataError label="the daily log" />
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-16">
@@ -86,7 +93,7 @@ export default async function DailyLogPage() {
               {entry.leetcode && entry.leetcode.length > 0 && (
                 <ul className="mt-3 flex flex-wrap gap-2">
                   {entry.leetcode.map((p) => {
-                    const solution = p.solutionUrl ?? solutionById.get(p.id) ?? null;
+                    const solution = p.solutionUrl ?? null;
                     return (
                       <li
                         key={p.slug}

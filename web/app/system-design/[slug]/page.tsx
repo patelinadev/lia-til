@@ -8,9 +8,12 @@ import {
 } from "../diagrams";
 import { deckBySlug, type DiagramKey, type Slide } from "../decks";
 import { getDecks } from "../data";
+import DataError from "@/app/components/DataError";
 
 // Render at request time so deck edits go live on refresh, no rebuild.
 export const dynamic = "force-dynamic";
+// Allow the request to wait out a cold backend start (Render free tier ~40s).
+export const maxDuration = 60;
 
 const DIAGRAMS: Record<DiagramKey, () => React.ReactElement> = {
   loadBalanced: DiagramLoadBalanced,
@@ -21,7 +24,8 @@ const DIAGRAMS: Record<DiagramKey, () => React.ReactElement> = {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const deck = deckBySlug(await getDecks(), slug);
+  const decks = await getDecks();
+  const deck = decks ? deckBySlug(decks, slug) : null;
   return { title: deck ? `${deck.title} · System Design` : "System Design" };
 }
 
@@ -66,7 +70,23 @@ function SlideCard({ slide }: { slide: Slide }) {
 
 export default async function DeckPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const deck = deckBySlug(await getDecks(), slug);
+  const decks = await getDecks();
+
+  if (!decks) {
+    return (
+      <main className="mx-auto w-full max-w-5xl px-6 py-12 sm:py-16">
+        <Link
+          href="/system-design"
+          className="text-sm text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-300"
+        >
+          &larr; System Design
+        </Link>
+        <DataError label="this deck" />
+      </main>
+    );
+  }
+
+  const deck = deckBySlug(decks, slug);
   if (!deck) notFound();
 
   return (
