@@ -38,8 +38,13 @@ export default async function PrivateDayPage({ params }: { params: Promise<{ dat
     );
   }
 
-  const e = entries.find((x) => x.date === date);
-  if (!e) notFound();
+  // entries are newest-first; find this day and its logged neighbours (skipping
+  // any calendar gaps) so we can page prev/next without returning to the list.
+  const idx = entries.findIndex((x) => x.date === date);
+  if (idx === -1) notFound();
+  const e = entries[idx];
+  const newer = idx > 0 ? entries[idx - 1].date : undefined; // the day after
+  const older = idx < entries.length - 1 ? entries[idx + 1].date : undefined; // the day before
 
   const secs = realSections(e.sections);
 
@@ -47,7 +52,9 @@ export default async function PrivateDayPage({ params }: { params: Promise<{ dat
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
       {back}
 
-      <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-3">
+      <DayNav older={older} newer={newer} className="mt-4" />
+
+      <div className="mt-4 mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="font-mono text-2xl font-bold sm:text-3xl">{e.date}</h1>
         {e.week && <span className="font-mono text-sm text-neutral-400">{e.week}</span>}
       </div>
@@ -99,6 +106,36 @@ export default async function PrivateDayPage({ params }: { params: Promise<{ dat
       ) : (
         <p className="mt-6 text-sm text-neutral-400">No sections recorded for this day.</p>
       )}
+
+      <DayNav older={older} newer={newer} className="mt-8 border-t border-neutral-200 pt-5 dark:border-neutral-800" />
     </main>
+  );
+}
+
+/** Prev (older) / next (newer) day links — moves between logged days only. */
+function DayNav({ older, newer, className = "" }: { older?: string; newer?: string; className?: string }) {
+  const link =
+    "inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-1.5 text-sm text-neutral-600 transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:text-neutral-400";
+  return (
+    <nav className={`flex items-center justify-between gap-3 ${className}`}>
+      {older ? (
+        <Link href={`/private/daily-log/${older}`} className={link}>
+          <span aria-hidden>&larr;</span>
+          <span className="font-mono text-xs">{older}</span>
+          <span className="text-neutral-400">prev day</span>
+        </Link>
+      ) : (
+        <span className="text-xs text-neutral-300 dark:text-neutral-600">&larr; earliest</span>
+      )}
+      {newer ? (
+        <Link href={`/private/daily-log/${newer}`} className={link}>
+          <span className="text-neutral-400">next day</span>
+          <span className="font-mono text-xs">{newer}</span>
+          <span aria-hidden>&rarr;</span>
+        </Link>
+      ) : (
+        <span className="text-xs text-neutral-300 dark:text-neutral-600">latest &rarr;</span>
+      )}
+    </nav>
   );
 }
