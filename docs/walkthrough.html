@@ -1013,8 +1013,8 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
     <div class="card">
       <ul>
         <li>✅ <b>Replicated</b> the CRUD + bulk pattern to applications, leetcode_problems, sd_decks — <b>all 4 tables live</b>.</li>
+        <li>✅ <b>Frontend error states</b>: every public page (<code>/applications</code> · <code>/daily-log</code> · <code>/leetcode</code> · <code>/system-design</code>) now returns <code>null</code> when the backend is unreachable and renders a shared <code>DataError</code> — no more falling back to a stale snapshot. The private daily log also dropped its local <code>getLeetcode()</code> solution map (the endpoint enriches links by id), so nothing on that path reads local files.</li>
         <li><b>Retire local sources</b>: seed each table via its bulk endpoint, then delete <code>web/content/*.json</code>, the ledger dependency, and every <code>import_*.py</code>.</li>
-        <li><b>Frontend</b>: replace each fallback with an <b>error state</b> (no snapshot).</li>
         <li><b>Cloud cron</b> (Render Cron Job) for scheduled / automated updates — replaces the local scheduled task. Zero local, zero laptop.</li>
       </ul>
     </div>

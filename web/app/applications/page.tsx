@@ -1,7 +1,7 @@
 import Link from "next/link";
-import fallbackData from "@/content/applications.json";
 import type { ApplicationsData } from "@/lib/content";
 import { fetchJsonWithRetry } from "@/lib/net";
+import DataError from "@/app/components/DataError";
 
 export const metadata = {
   title: "Applications · Lia's Learning Progress",
@@ -12,16 +12,13 @@ export const dynamic = "force-dynamic";
 // Allow the request to wait out a cold backend start (Render free tier ~40s).
 export const maxDuration = 60;
 
-/** Fetch the aggregates from the backend at request time; fall back to the
- * committed JSON only if API_URL is unset or the API stays unreachable through
- * the retry budget (so a cold start no longer drops us to the stale snapshot). */
-async function getSummary(): Promise<ApplicationsData> {
+/** Fetch the aggregates from the backend at request time. Returns null if the
+ * API is unset/unreachable (through the retry budget) — the page then shows an
+ * error state rather than a stale offline snapshot (the DB is source of truth). */
+async function getSummary(): Promise<ApplicationsData | null> {
   const base = process.env.API_URL?.replace(/\/$/, "");
-  if (base) {
-    const data = await fetchJsonWithRetry<ApplicationsData>(`${base}/api/applications/summary`);
-    if (data) return data;
-  }
-  return fallbackData as ApplicationsData;
+  if (!base) return null;
+  return fetchJsonWithRetry<ApplicationsData>(`${base}/api/applications/summary`);
 }
 
 // Group the known statuses into a funnel. We deliberately do NOT show an
@@ -94,6 +91,22 @@ function buildMonths(byDate: { date: string; count: number }[]) {
 
 export default async function ApplicationsPage() {
   const data = await getSummary();
+
+  if (!data) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-6 py-12 sm:py-16">
+        <Link
+          href="/"
+          className="text-sm text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-300"
+        >
+          &larr; Learning Progress
+        </Link>
+        <h1 className="mt-6 text-3xl font-bold sm:text-4xl">Applications</h1>
+        <DataError label="the applications data" />
+      </main>
+    );
+  }
+
   const groups = GROUPS.filter(
     (g) => g.label !== "Offers" || sumStatuses(data.byStatus, g.statuses) > 0,
   );

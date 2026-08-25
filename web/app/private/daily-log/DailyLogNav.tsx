@@ -13,14 +13,7 @@ function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-export default function DailyLogNav({
-  entries,
-  solutions,
-}: {
-  entries: FullDailyLogEntry[];
-  /** problem id → Lia's solution URL, resolved once on the server from leetcode.json */
-  solutions: Record<number, string>;
-}) {
+export default function DailyLogNav({ entries }: { entries: FullDailyLogEntry[] }) {
   // days-with-entries per "YYYY-MM", the set of years, and default selection.
   const { daysByMonth, years } = useMemo(() => {
     const dbm: Record<string, Set<number>> = {};
@@ -230,7 +223,7 @@ export default function DailyLogNav({
                 {e.leetcode.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {e.leetcode.map((p) => {
-                      const url = p.solutionUrl ?? solutions[p.id] ?? null;
+                      const url = p.solutionUrl ?? null;
                       const label = `LC ${p.id}${p.title ? ` ${p.title}` : ""}`;
                       return url ? (
                         <a

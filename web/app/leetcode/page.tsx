@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { getLeetcode } from "@/lib/content.server";
 import type { LeetcodeContent } from "@/lib/content";
+import { fetchJsonWithRetry } from "@/lib/net";
+import DataError from "@/app/components/DataError";
 import LeetCodeExplorer from "./LeetCodeExplorer";
 
 export const metadata = {
@@ -9,24 +10,36 @@ export const metadata = {
 
 // Always render at request time so the table shows the latest data from the API.
 export const dynamic = "force-dynamic";
+// Allow the request to wait out a cold backend start (Render free tier ~40s).
+export const maxDuration = 60;
 
-/** Fetch the problem set from the backend at request time; fall back to the
- * committed leetcode.json if API_URL is unset or the API is unreachable. */
-async function getLeetcodeData(): Promise<LeetcodeContent> {
+/** Fetch the problem set from the backend at request time. Returns null if the
+ * API is unset/unreachable — the page then shows an error state. */
+async function getLeetcodeData(): Promise<LeetcodeContent | null> {
   const base = process.env.API_URL?.replace(/\/$/, "");
-  if (base) {
-    try {
-      const res = await fetch(`${base}/api/leetcode`, { cache: "no-store" });
-      if (res.ok) return (await res.json()) as LeetcodeContent;
-    } catch {
-      // fall through to the committed snapshot
-    }
-  }
-  return getLeetcode();
+  if (!base) return null;
+  return fetchJsonWithRetry<LeetcodeContent>(`${base}/api/leetcode`);
 }
 
 export default async function LeetCodePage() {
-  const { track, trackUrl, problems } = await getLeetcodeData();
+  const data = await getLeetcodeData();
+
+  if (!data) {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-6 py-12 sm:py-16">
+        <Link
+          href="/"
+          className="text-sm text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-300"
+        >
+          &larr; Learning Progress
+        </Link>
+        <h1 className="mt-6 text-3xl font-bold sm:text-4xl">LeetCode</h1>
+        <DataError label="the LeetCode problems" />
+      </main>
+    );
+  }
+
+  const { track, trackUrl, problems } = data;
 
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-12 sm:py-16">
