@@ -1,19 +1,27 @@
 import type { ReactNode } from "react";
 
-/** Minimal inline markdown: **bold** only (everything else stays literal). */
+/** Minimal inline markdown: **bold** and `code` (everything else stays literal). */
 function Inline({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
   return (
     <>
-      {parts.map((p, i) =>
-        p.startsWith("**") && p.endsWith("**") ? (
-          <strong key={i} className="font-semibold text-neutral-800 dark:text-neutral-200">
-            {p.slice(2, -2)}
-          </strong>
-        ) : (
-          <span key={i}>{p}</span>
-        ),
-      )}
+      {parts.map((p, i) => {
+        if (p.startsWith("**") && p.endsWith("**")) {
+          return (
+            <strong key={i} className="font-semibold text-neutral-800 dark:text-neutral-200">
+              {p.slice(2, -2)}
+            </strong>
+          );
+        }
+        if (p.startsWith("`") && p.endsWith("`") && p.length > 2) {
+          return (
+            <code key={i} className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-[0.85em] text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+              {p.slice(1, -1)}
+            </code>
+          );
+        }
+        return <span key={i}>{p}</span>;
+      })}
     </>
   );
 }
@@ -39,6 +47,22 @@ export default function SectionBody({ md }: { md: string }) {
   while (i < lines.length) {
     const t = lines[i].trim();
     if (!t) { i++; continue; }
+
+    // ---- fenced code block ----
+    if (t.startsWith("```")) {
+      const code: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) { code.push(lines[i]); i++; }
+      i++; // skip the closing fence
+      blocks.push(
+        <pre key={key++} className="my-2 overflow-x-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950">
+          <code className="font-mono text-[12.5px] leading-relaxed text-neutral-700 dark:text-neutral-300">
+            {code.join("\n")}
+          </code>
+        </pre>,
+      );
+      continue;
+    }
 
     // ---- table ----
     if (isRow(lines[i])) {
