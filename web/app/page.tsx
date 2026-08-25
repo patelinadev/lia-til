@@ -62,19 +62,8 @@ export default function Home() {
             &rarr;
           </span>
         </Link>
-
-        <Link
-          href="/resume"
-          className="group flex items-center justify-between rounded-xl border border-neutral-200 px-5 py-4 text-left transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600"
-        >
-          <span>
-            <span className="block font-semibold">Résumé</span>
-            <span className="block text-sm text-neutral-500">The one-page résumé</span>
-          </span>
-          <span className="text-neutral-400 transition-transform group-hover:translate-x-0.5">
-            &rarr;
-          </span>
-        </Link>
+        {/* Public "Résumé" (A) deferred — no base_resume.md yet. Re-add this card
+            once a public master résumé exists. The /resume route + backend stay ready. */}
       </nav>
     </main>
   );
