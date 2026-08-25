@@ -102,6 +102,29 @@
   </div>
   <p class="hint">Grey code lines starting with <code>//</code> or <code>#</code> are comments. <b>→ returns</b> shows the actual value that line/call hands back.</p>
 
+  <h2 style="font-family:'Fraunces',serif;font-weight:600;font-size:20px;margin:6px 0 4px">The shape — arrows &amp; returns</h2>
+  <p style="margin:0 0 6px;font-size:13px;color:var(--ink-faint)"><b style="color:var(--ink)">Solid ▸</b> = a request (going out) · <b style="color:var(--ink)">dashed ◂</b> = the response coming back. Read top to bottom.</p>
+  <div style="overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 30px">
+  <pre class="mermaid">%%{init: {'theme':'neutral'}}%%
+sequenceDiagram
+    participant B as 🧑 Browser
+    participant V as 🟢 Vercel server
+    participant F as 🟠 FastAPI + Neon
+    B->>V: GET /private/applications (+ lt_session cookie)
+    Note over V: requireAdmin() → getSession()<br/>verify JWT with AUTH_SECRET
+    Note over V: → { login: "patelinadev", … }  (session ok)
+    V->>F: GET /api/applications/full<br/>header x-admin-secret: BACKEND_SECRET
+    Note over F: secret matches → query Neon DB
+    F-->>V: { total: 129, applications: [ … ] }
+    Note over V: build the HTML table
+    V-->>B: HTML (the page you see)
+    Note over B,F: — incognito (no cookie) —
+    B->>V: GET /private/applications (no cookie)
+    Note over V: getSession() → null
+    V-->>B: 307 → /api/auth/login  (FastAPI never called)
+  </pre>
+  </div>
+
   <div class="flow">
 
     <div class="step browser">
