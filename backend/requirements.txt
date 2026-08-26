@@ -3,3 +3,6 @@ uvicorn[standard]>=0.29
 SQLAlchemy>=2.0
 psycopg2-binary>=2.9
 python-dotenv>=1.0
+# MCP server for the phone/Cowork custom connector (daily-log + index tools).
+# Needs Python >= 3.10; if absent the app still runs the plain HTTP API.
+fastmcp>=3.4

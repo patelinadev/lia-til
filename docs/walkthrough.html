@@ -266,6 +266,7 @@
     <a href="#p2s4"><span class="st">P2·S4</span> CRUD API <span class="dot dot--go"></span></a>
     <a href="#p2s5"><span class="st">P2·S5</span> Cloud daily log <span class="dot dot--you"></span></a>
     <a href="#p2s6"><span class="st">P2·S6</span> Résumé + sync <span class="dot dot--go"></span></a>
+    <a href="#p2s7"><span class="st">P2·S7</span> Phone MCP connector <span class="dot dot--go"></span></a>
   </div>
 
   <div class="legend">
@@ -1150,6 +1151,65 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
     public git repo; the secret stays in <code>~/.til-env</code>, never printed.</span></div>
   </section>
 
+  <section class="stage" id="p2s7">
+    <div class="stage__head">
+      <span class="badge">P2 · S7</span>
+      <h2>Phone MCP connector — daily-log CRUD from Cowork</h2>
+      <span class="status status--done">✅ Built · tested locally · deploy + connector pending</span>
+      <span class="stage__ver">v0.9.0</span>
+    </div>
+    <p class="goal">Let a <b>phone / Cowork</b> chat create, read, edit and delete the daily log by
+    talking to the backend as <b>MCP tools</b> through a <b>claude.ai custom connector</b> — no laptop,
+    no <code>~/.til-env</code>, no git.</p>
+
+    <div class="callout"><span class="k">Why a connector, not bash</span><span>The Cowork cloud
+    sandbox <b>blocks bash egress</b> to <code>lia-til.onrender.com</code> (curl → 403/000), but an
+    MCP <b>connector</b> rides a different transport that <b>does</b> reach it. So a connector is the
+    path to touch the log from the phone. Caveat: interactively-authed connectors may be <b>absent</b>
+    in headless/cron runs — this reliably powers interactive phone-chat logging, not (yet) the
+    unattended scheduled check-in.</span></div>
+
+    <div class="phase"><span class="phase__k">A</span><h3>Backend — mount an MCP server on the same FastAPI app</h3></div>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Library</span><div><code>fastmcp&gt;=3.4</code> (needs
+      Python ≥3.10, so a <code>.python-version</code> = <code>3.12.7</code> pin was added). One deploy,
+      zero new infra — the MCP app is <b>mounted onto the existing FastAPI app</b>, reusing the same
+      Neon DB and handlers.</div></div>
+      <div class="rb__row"><span class="rb__n">Tools</span><div><code>main.py</code> exposes 8 tools:
+      <code>list_daily_logs</code>, <code>get_daily_log</code>, <code>upsert_daily_log</code>,
+      <code>patch_daily_log</code>, <code>append_section</code> (get→merge→save one heading without
+      clobbering the rest), <code>delete_daily_log</code>, <code>get_index</code>, <code>set_index</code>.
+      They call the <b>same handlers</b> as the HTTP API, so every write still flows through
+      <code>_shadow()</code> append-only backup.</div></div>
+      <div class="rb__row"><span class="rb__n">Scope</span><div>Mirrors <code>require_daily_writer</code>:
+      <b>daily-log + index ONLY</b> — never applications, résumés, LeetCode, or destructive table ops.
+      A leaked connector can only touch the daily log, and even that is recoverable via the master-only
+      shadow restore.</div></div>
+      <div class="rb__row"><span class="rb__n">Transport</span><div>Stateless Streamable-HTTP
+      (<code>mcp.http_app(path="/", stateless_http=True, host_origin_protection=False)</code>); its
+      session manager is started from the app's <code>lifespan</code>. Origin protection is off because
+      the URL token (below) is the auth and Render's proxy would otherwise trip DNS-rebinding checks.</div></div>
+    </div>
+
+    <div class="phase"><span class="phase__k">B</span><h3>Auth (Option 1 / MVP) — a secret URL token</h3></div>
+    <p class="phase__note">The whole MCP app is mounted under an unguessable path,
+    <code>/mcp/&lt;MCP_TOKEN&gt;/</code> — <b>knowing that URL is the credential</b>; a wrong/absent token
+    just 404s. <code>MCP_TOKEN</code> is a <code>secrets.token_urlsafe(32)</code> string kept in Render's
+    env (never committed).</p>
+    <div class="card rb">
+      <div class="rb__row"><span class="rb__n">Deploy</span><div>Set <code>MCP_TOKEN</code> on Render
+      (alongside the existing <code>BACKEND_SECRET</code> + <code>DAILYLOG_SECRET</code>) → push to
+      <code>main</code> → Render auto-deploys. Verified locally: the 8 tools list, a full CRUD
+      round-trip works, patch preserves untouched sections, and a wrong token → 404.</div></div>
+      <div class="rb__row"><span class="rb__n">Connect</span><div>On the phone / claude.ai → Settings →
+      Connectors → <b>Add custom connector</b> → paste
+      <code>https://lia-til.onrender.com/mcp/&lt;MCP_TOKEN&gt;/</code> (<b>trailing slash matters</b> —
+      no-slash 307-redirects, slash → 200).</div></div>
+      <p class="rb__upd"><b>Upgrade path (Option 2):</b> swap the URL token for OAuth / a custom-header
+      check when one's wanted — the tools stay identical.</p>
+    </div>
+  </section>
+
   <!-- ============================ VERSION HISTORY ============================ -->
   <div class="phase" style="margin-top:44px"><span class="phase__k">§</span><h3>Version History</h3></div>
   <div class="vhist">
@@ -1169,6 +1229,7 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
         <tr><td class="v">v0.7.0</td><td>P2 · S5 — cloud-only daily log: full vault record stored in a <code>sections</code> column (store-everything, filter-on-read; 38 days migrated via the API); rule-based tags (served public+private); unified public/private explorer (fuzzy + calendar/week/tri-state-tag filters, filter persisted in the URL); per-day pages with checkbox/table/code-highlight rendering + ↑/↓ pager; the <code>~/.til-env</code> secret write-flow (skills → API); a private <code>📖 INDEX/TL;DR</code> navigator (<code>site_meta</code> kv + gated <code>/api/index</code>) shown as a first-visit book drawer</td><td>🚧 In progress</td></tr>
         <tr><td class="v">v0.7.1</td><td>P2 · S5 — <b>skills write the API (skip Obsidian)</b>: learning-log + daily-planner rewritten to read/write the daily log via the CRUD API instead of the vault (no daily <code>.md</code> file). Dropped Search / Weekly / Flashcards / Inbox; renamed the 快报 section → <code>Quick Glance</code>; all sections private, public = one-line <code>summary</code> (+ leetcode chips); INDEX refresh = skill auto-regen (<code>PUT /api/index</code>). Stale <code>~/.claude/commands/daily-planner</code> copy retired.</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.8.0</td><td>P2 · S6 — <b>résumé integration</b>: <code>resumes</code> table + gated CRUD (public <code>/api/resume</code> = base only; <code>/full</code> + CRUD + bulk gated); public <code>/resume</code> + private archive pages built, then <b>display deferred</b> (no <code>base_resume.md</code> yet). Cross-repo publish spec handed to <code>jd-based-resume</code> (it writes applications + résumés straight to the API; <b>App# ≠ Resume#</b>, one résumé reused across many apps, link via <code>applications.resume</code> → <code>résumé.slug</code>). Résumé display is deferred by choice (skipped for now); the backend + pages are complete.</td><td>✅ Built · display deferred</td></tr>
+        <tr><td class="v">v0.9.0</td><td>P2 · S7 — <b>phone MCP connector</b>: an MCP server mounted on the same FastAPI app (<code>fastmcp</code>, stateless Streamable-HTTP) exposes 8 daily-log + index tools (incl. <code>append_section</code>'s get→merge→save) that reuse the existing gated handlers, so writes stay <code>_shadow()</code>-backed and scoped to daily-log+index only. Gated by a secret URL token — mounted under <code>/mcp/&lt;MCP_TOKEN&gt;/</code> (Option 1 / MVP; OAuth is the later Option 2). Lets a Cowork phone chat CRUD the log where sandbox bash egress to Render is blocked.</td><td>✅ Built · deploy pending</td></tr>
         <tr><td class="v">next</td><td>Planned — applications catch-up (DB 129 → ledger ~154, via the jd-based-resume sync) · CoWork scheduled task → API (spec handed off) · résumé display once a <code>base_resume.md</code> exists · <code>study_notes</code> content migration + display page · in-page INDEX editor · English summaries for content-rich migrated days · cloud scheduled sync (Render Cron)</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
