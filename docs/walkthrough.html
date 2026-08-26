@@ -553,6 +553,7 @@ git push origin v0.2.0</pre>
           <tr><td class="v">S4</td><td>CRUD write API — cloud-only data (all 4 tables; local sources retired)</td><td>✅ Done (v0.6.0)</td></tr>
           <tr><td class="v">S5</td><td>Cloud-only daily log (full record + tags + rich UI); skills write the API / retire Obsidian (<b>skills cutover ✅ v0.7.1</b>; study_notes + cron remain)</td><td>🚧 In progress (v0.7.x)</td></tr>
           <tr><td class="v">S6</td><td>Résumé integration — resumes table + gated CRUD; public /resume + private archive built; <code>jd-based-resume</code> publishes applications + résumés straight to the API</td><td>✅ Built · display deferred by choice (v0.8.0)</td></tr>
+          <tr><td class="v">S7</td><td>Phone MCP connector — 8 daily-log/index MCP tools mounted on the FastAPI app (reuse the gated handlers, writes stay <code>_shadow()</code>-backed); claude.ai authless custom connector for phone/Cowork CRUD</td><td>✅ Done · phone-verified (v0.9.0)</td></tr>
         </tbody>
       </table>
     </div>
@@ -1155,7 +1156,7 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
     <div class="stage__head">
       <span class="badge">P2 · S7</span>
       <h2>Phone MCP connector — daily-log CRUD from Cowork</h2>
-      <span class="status status--done">✅ Built · tested locally · deploy + connector pending</span>
+      <span class="status status--done">✅ Done · live · phone-verified</span>
       <span class="stage__ver">v0.9.0</span>
     </div>
     <p class="goal">Let a <b>phone / Cowork</b> chat create, read, edit and delete the daily log by
@@ -1203,10 +1204,16 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
       round-trip works, patch preserves untouched sections, and a wrong token → 404.</div></div>
       <div class="rb__row"><span class="rb__n">Connect</span><div>On the phone / claude.ai → Settings →
       Connectors → <b>Add custom connector</b> → paste
-      <code>https://lia-til.onrender.com/mcp/&lt;MCP_TOKEN&gt;/</code> (<b>trailing slash matters</b> —
-      no-slash 307-redirects, slash → 200).</div></div>
-      <p class="rb__upd"><b>Upgrade path (Option 2):</b> swap the URL token for OAuth / a custom-header
-      check when one's wanted — the tools stay identical.</p>
+      <code>https://lia-til.onrender.com/mcp/&lt;MCP_TOKEN&gt;/</code>; leave the <b>OAuth Client ID/Secret
+      blank</b> (authless). claude.ai strips the trailing slash and GETs the no-slash path, which
+      <b>307-redirects</b> to the slash form and connects fine (GET on the endpoint → 405, spec-OK).</div></div>
+      <div class="rb__row"><span class="rb__n">Gotcha</span><div>Saving/changing <code>MCP_TOKEN</code> on
+      Render <b>triggers a restart</b>, so the endpoint 404s for ~30s — a 404 right after an env change
+      usually just means "still restarting", not a code bug.</div></div>
+      <p class="rb__upd"><b>Shipped ✅</b> Deployed (merge <code>a8c4ef4</code>), connector added authless,
+      and <b>phone-verified</b> end-to-end (read → create → read-back → delete round-trip all pass).
+      <b>Upgrade path (Option 2):</b> swap the URL token for OAuth / a custom-header check later — the
+      tools stay identical.</p>
     </div>
   </section>
 
@@ -1229,7 +1236,7 @@ curl -i -X DELETE $B/api/daily-log/2026-08-21</pre>
         <tr><td class="v">v0.7.0</td><td>P2 · S5 — cloud-only daily log: full vault record stored in a <code>sections</code> column (store-everything, filter-on-read; 38 days migrated via the API); rule-based tags (served public+private); unified public/private explorer (fuzzy + calendar/week/tri-state-tag filters, filter persisted in the URL); per-day pages with checkbox/table/code-highlight rendering + ↑/↓ pager; the <code>~/.til-env</code> secret write-flow (skills → API); a private <code>📖 INDEX/TL;DR</code> navigator (<code>site_meta</code> kv + gated <code>/api/index</code>) shown as a first-visit book drawer</td><td>🚧 In progress</td></tr>
         <tr><td class="v">v0.7.1</td><td>P2 · S5 — <b>skills write the API (skip Obsidian)</b>: learning-log + daily-planner rewritten to read/write the daily log via the CRUD API instead of the vault (no daily <code>.md</code> file). Dropped Search / Weekly / Flashcards / Inbox; renamed the 快报 section → <code>Quick Glance</code>; all sections private, public = one-line <code>summary</code> (+ leetcode chips); INDEX refresh = skill auto-regen (<code>PUT /api/index</code>). Stale <code>~/.claude/commands/daily-planner</code> copy retired.</td><td>✅ Done</td></tr>
         <tr><td class="v">v0.8.0</td><td>P2 · S6 — <b>résumé integration</b>: <code>resumes</code> table + gated CRUD (public <code>/api/resume</code> = base only; <code>/full</code> + CRUD + bulk gated); public <code>/resume</code> + private archive pages built, then <b>display deferred</b> (no <code>base_resume.md</code> yet). Cross-repo publish spec handed to <code>jd-based-resume</code> (it writes applications + résumés straight to the API; <b>App# ≠ Resume#</b>, one résumé reused across many apps, link via <code>applications.resume</code> → <code>résumé.slug</code>). Résumé display is deferred by choice (skipped for now); the backend + pages are complete.</td><td>✅ Built · display deferred</td></tr>
-        <tr><td class="v">v0.9.0</td><td>P2 · S7 — <b>phone MCP connector</b>: an MCP server mounted on the same FastAPI app (<code>fastmcp</code>, stateless Streamable-HTTP) exposes 8 daily-log + index tools (incl. <code>append_section</code>'s get→merge→save) that reuse the existing gated handlers, so writes stay <code>_shadow()</code>-backed and scoped to daily-log+index only. Gated by a secret URL token — mounted under <code>/mcp/&lt;MCP_TOKEN&gt;/</code> (Option 1 / MVP; OAuth is the later Option 2). Lets a Cowork phone chat CRUD the log where sandbox bash egress to Render is blocked.</td><td>✅ Built · deploy pending</td></tr>
+        <tr><td class="v">v0.9.0</td><td>P2 · S7 — <b>phone MCP connector</b>: an MCP server mounted on the same FastAPI app (<code>fastmcp</code>, stateless Streamable-HTTP) exposes 8 daily-log + index tools (incl. <code>append_section</code>'s get→merge→save) that reuse the existing gated handlers, so writes stay <code>_shadow()</code>-backed and scoped to daily-log+index only. Gated by a secret URL token — mounted under <code>/mcp/&lt;MCP_TOKEN&gt;/</code> (Option 1 / MVP; OAuth is the later Option 2). Lets a Cowork phone chat CRUD the log where sandbox bash egress to Render is blocked.</td><td>✅ Done · phone-verified</td></tr>
         <tr><td class="v">next</td><td>Planned — applications catch-up (DB 129 → ledger ~154, via the jd-based-resume sync) · CoWork scheduled task → API (spec handed off) · résumé display once a <code>base_resume.md</code> exists · <code>study_notes</code> content migration + display page · in-page INDEX editor · English summaries for content-rich migrated days · cloud scheduled sync (Render Cron)</td><td>🗺️ Planned</td></tr>
       </tbody>
     </table>
