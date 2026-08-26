@@ -38,6 +38,16 @@ ADMIN_SECRET = os.environ.get("BACKEND_SECRET")
 # CRUD from any device without holding the master secret (which also unlocks the full
 # applications ledger, résumés, and deletes). Optional; unset → only the master works.
 DAILYLOG_SECRET = os.environ.get("DAILYLOG_SECRET")
+# URL-embedded token gating the mounted MCP server (phone / Cowork custom connector).
+# The MCP endpoint lives under /mcp/<MCP_TOKEN>/ — knowing that full path IS the auth
+# (Option 1 / MVP); a wrong or absent token just 404s. Unset → the MCP server is not
+# mounted at all. Keep it long + random (secrets.token_urlsafe(32)); NEVER commit it —
+# set it in Render's env, same as the other secrets. Upgrade path (Option 2): replace
+# this URL token with OAuth / a header check later, tools unchanged.
+MCP_TOKEN = os.environ.get("MCP_TOKEN")
+# Built at the bottom of the file (if fastmcp is installed AND MCP_TOKEN is set); the
+# lifespan below starts/stops its Streamable-HTTP session manager alongside the app.
+_MCP_APP = None
 
 
 def require_admin(x_admin_secret: Optional[str] = Header(default=None)) -> None:
@@ -103,7 +113,14 @@ async def lifespan(_app: FastAPI):
                     conn.execute(text(f"ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS {col}"))
             except Exception:
                 pass
-    yield
+    # Starlette does NOT auto-run a mounted sub-app's lifespan, so when the MCP
+    # server is mounted (bottom of file), nest its lifespan inside ours to start
+    # and stop its Streamable-HTTP session manager with the app.
+    if _MCP_APP is not None:
+        async with _MCP_APP.lifespan(_app):
+            yield
+    else:
+        yield
 
 
 app = FastAPI(title="lia-til API", lifespan=lifespan)
@@ -1296,3 +1313,197 @@ def shadow_restore(kind: Optional[str] = None, key: Optional[str] = None, before
             "restored": {"daily_log": len(restored_days), "index": len(restored_index)},
             "dates": sorted(restored_days),
         }
+
+
+# ===========================================================================
+# MCP server (P2·S7) — exposes the daily-log + index CRUD as MCP tools so a
+# phone / Cowork chat can manage the log through a claude.ai *custom connector*.
+#
+# WHY a connector (not plain bash): the Cowork cloud sandbox blocks bash egress
+# to lia-til.onrender.com, but MCP connector traffic rides a different transport
+# that reaches it — so this is the path to CRUD the log from the phone.
+#
+# AUTH (Option 1 / MVP): the whole MCP app is mounted under a secret, unguessable
+# path — /mcp/<MCP_TOKEN>/. Knowing that URL is the credential; a wrong/absent
+# token just 404s. host_origin_protection is off because the URL token is the
+# auth and Render's proxy would otherwise trip DNS-rebinding checks.
+#
+# The tools call the SAME handlers as the HTTP API, so every write still flows
+# through _shadow() append-only backup, and the scope mirrors require_daily_writer:
+# daily-log + index ONLY (never applications / résumé / leetcode / deletes).
+# Upgrade path (Option 2): swap the URL token for OAuth / a header check; tools
+# stay identical.
+# ===========================================================================
+try:
+    from fastmcp import FastMCP  # v3+ (needs Python >= 3.10)
+except Exception:  # not installed / old Python — run the plain HTTP API without MCP
+    FastMCP = None
+
+
+def _http_err(exc: HTTPException) -> dict:
+    """Turn a handler's HTTPException into a plain tool result the model can read
+    (e.g. a 404 'not found') instead of surfacing as an opaque tool crash."""
+    return {"error": f"{exc.status_code}: {exc.detail}"}
+
+
+if FastMCP is not None and MCP_TOKEN:
+    mcp = FastMCP(
+        name="lia-til-daily",
+        instructions=(
+            "Manage Lia's private daily learning log (lia-til). These tools cover "
+            "the daily-log entries and the INDEX/TL;DR navigator ONLY. Dates are "
+            "ISO 'YYYY-MM-DD'. To change part of an existing day, prefer "
+            "get_daily_log then upsert_daily_log with the merged result — "
+            "upsert/patch REPLACE each field you send (sections is replaced "
+            "wholesale, never per-heading-merged). To add one section without "
+            "disturbing the others, use append_section."
+        ),
+    )
+
+    _RO = {"readOnlyHint": True, "openWorldHint": False}
+    _WR = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+    _DEL = {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True, "openWorldHint": False}
+
+    @mcp.tool(annotations=_RO)
+    def list_daily_logs(limit: int = 30) -> list[dict]:
+        """List recent daily-log days, newest first. Compact view: each item has
+        date, week, summary, doneCount, leetcodeCount, tags, and the section
+        HEADINGS (not their content). Call get_daily_log(date) for full content.
+        `limit` caps how many days come back (default 30)."""
+        if SessionLocal is None:
+            return []
+        with SessionLocal() as session:
+            rows = (
+                session.execute(
+                    select(DailyLog).order_by(DailyLog.date.desc()).limit(max(1, limit))
+                )
+                .scalars()
+                .all()
+            )
+            return [
+                {
+                    "date": r.date,
+                    "week": r.week,
+                    "summary": r.summary,
+                    "doneCount": len(r.done or []),
+                    "leetcodeCount": len(r.leetcode or []),
+                    "tags": _tags_for(r),
+                    "sectionHeadings": sorted((r.sections or {}).keys()),
+                }
+                for r in rows
+            ]
+
+    @mcp.tool(annotations=_RO)
+    def get_daily_log(date: str) -> dict:
+        """Get one day's FULL stored record, including the private `sections`.
+        Returns {"error": "404: not found"} if that day doesn't exist yet."""
+        try:
+            return daily_log_get(date)
+        except HTTPException as e:
+            return _http_err(e)
+
+    @mcp.tool(annotations=_WR)
+    def upsert_daily_log(
+        date: str,
+        week: Optional[str] = None,
+        done: Optional[list[str]] = None,
+        summary: Optional[str] = None,
+        note: Optional[str] = None,
+        leetcode: Optional[list[dict]] = None,
+        sections: Optional[dict] = None,
+        tags: Optional[list[str]] = None,
+    ) -> dict:
+        """Create-or-replace a whole day (upsert). WARNING: any field you omit is
+        stored empty/null — to keep existing content, read get_daily_log(date)
+        first and pass the merged values back. Auto-backed up via shadow history.
+        Returns the stored record plus {"created": true|false}."""
+        body = DailyLogIn(
+            week=week,
+            done=done or [],
+            summary=summary,
+            note=note,
+            leetcode=leetcode or [],
+            sections=sections,
+            tags=tags or [],
+        )
+        return daily_log_put(date, body)
+
+    @mcp.tool(annotations=_WR)
+    def patch_daily_log(
+        date: str,
+        week: Optional[str] = None,
+        done: Optional[list[str]] = None,
+        summary: Optional[str] = None,
+        note: Optional[str] = None,
+        leetcode: Optional[list[dict]] = None,
+        sections: Optional[dict] = None,
+        tags: Optional[list[str]] = None,
+    ) -> dict:
+        """Update ONLY the fields you pass, on an existing day (404 if it doesn't
+        exist yet — use upsert_daily_log to create). Each field you pass REPLACES
+        the stored one; `sections` is replaced wholesale (no per-heading merge —
+        use append_section for that). Auto-backed up via shadow history."""
+        provided = {
+            k: v
+            for k, v in dict(
+                week=week, done=done, summary=summary, note=note,
+                leetcode=leetcode, sections=sections, tags=tags,
+            ).items()
+            if v is not None
+        }
+        try:
+            return daily_log_patch(date, DailyLogPatch(**provided))
+        except HTTPException as e:
+            return _http_err(e)
+
+    @mcp.tool(annotations=_WR)
+    def append_section(date: str, heading: str, content: str) -> dict:
+        """Add or overwrite ONE section heading on a day WITHOUT touching the
+        others (does the get→merge→save for you). Creates the day if it doesn't
+        exist. Auto-backed up via shadow history."""
+        try:
+            existing = daily_log_get(date)
+            sections = dict(existing.get("sections") or {})
+            base = DailyLogIn(
+                week=existing.get("week"),
+                done=existing.get("done") or [],
+                summary=existing.get("summary"),
+                note=existing.get("note"),
+                leetcode=existing.get("leetcode") or [],
+                tags=existing.get("tags") or [],
+                sections=sections,
+            )
+        except HTTPException:
+            base = DailyLogIn()  # day doesn't exist yet → start fresh
+            sections = {}
+        sections[heading] = content
+        base.sections = sections
+        return daily_log_put(date, base)
+
+    @mcp.tool(annotations=_DEL)
+    def delete_daily_log(date: str) -> dict:
+        """Delete an entire day. Recoverable via the master-only shadow restore.
+        Returns {"error": "404: not found"} if the day doesn't exist."""
+        try:
+            return daily_log_delete(date)
+        except HTTPException as e:
+            return _http_err(e)
+
+    @mcp.tool(annotations=_RO)
+    def get_index() -> dict:
+        """Get the private INDEX/TL;DR markdown navigator ({value, updatedAt})."""
+        return index_get()
+
+    @mcp.tool(annotations=_WR)
+    def set_index(value: str) -> dict:
+        """Replace the whole INDEX/TL;DR markdown document (upsert). Auto-backed up."""
+        return index_put(IndexBody(value=value))
+
+    # Stateless Streamable-HTTP app, mounted under the secret token prefix.
+    # Final endpoint for the connector: https://<host>/mcp/<MCP_TOKEN>/
+    _MCP_APP = mcp.http_app(
+        path="/",
+        stateless_http=True,
+        host_origin_protection=False,
+    )
+    app.mount(f"/mcp/{MCP_TOKEN}", _MCP_APP)
