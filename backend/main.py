@@ -24,12 +24,29 @@ LEETCODE_TRACK_URL = "https://space.bilibili.com/206214/channel/collectiondetail
 # Shared secret for the private endpoints. The site's server (never the browser)
 # sends it after it has verified the admin's session. Set BACKEND_SECRET on Render.
 ADMIN_SECRET = os.environ.get("BACKEND_SECRET")
+# Scoped write token — authorizes ONLY the daily-log + index routes, nothing else.
+# Meant for a less-trusted env (cloud chat / a scheduled task) so it can do daily-log
+# CRUD from any device without holding the master secret (which also unlocks the full
+# applications ledger, résumés, and deletes). Optional; unset → only the master works.
+DAILYLOG_SECRET = os.environ.get("DAILYLOG_SECRET")
 
 
 def require_admin(x_admin_secret: Optional[str] = Header(default=None)) -> None:
     """Gate a private endpoint: reject unless the shared secret matches. If the
-    secret isn't configured at all, the private endpoints stay closed."""
+    secret isn't configured at all, the private endpoints stay closed. This is the
+    FULL-power gate (applications ledger, résumés, deletes) — master secret only."""
     if not ADMIN_SECRET or x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
+def require_daily_writer(x_admin_secret: Optional[str] = Header(default=None)) -> None:
+    """Gate for the daily-log + index routes only. Accepts the master BACKEND_SECRET
+    OR the scoped DAILYLOG_SECRET. Lets a cloud/phone chat session log the day (CRUD
+    on daily_logs + index) with a token whose blast radius is just the daily log —
+    it can't touch applications, résumés, or delete other tables."""
+    ok_master = bool(ADMIN_SECRET) and x_admin_secret == ADMIN_SECRET
+    ok_scoped = bool(DAILYLOG_SECRET) and x_admin_secret == DAILYLOG_SECRET
+    if not (ok_master or ok_scoped):
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
@@ -334,7 +351,7 @@ def daily_log():
     return _daily_log_entries()
 
 
-@app.get("/api/daily-log/full", dependencies=[Depends(require_admin)])
+@app.get("/api/daily-log/full", dependencies=[Depends(require_daily_writer)])
 def daily_log_full():
     """PRIVATE — the full daily log through the authenticated channel, INCLUDING
     the private `sections` (Success Diary / interview / advisor / companies).
@@ -376,7 +393,7 @@ def _apply_full(row: DailyLog, body: DailyLogIn) -> None:
     row.tags = body.tags
 
 
-@app.get("/api/daily-log/{date}", dependencies=[Depends(require_admin)])
+@app.get("/api/daily-log/{date}", dependencies=[Depends(require_daily_writer)])
 def daily_log_get(date: str):
     """PRIVATE — one day's raw stored row (for editing)."""
     if SessionLocal is None:
@@ -388,7 +405,7 @@ def daily_log_get(date: str):
         return _serialize_daily(row)
 
 
-@app.put("/api/daily-log/{date}", dependencies=[Depends(require_admin)])
+@app.put("/api/daily-log/{date}", dependencies=[Depends(require_daily_writer)])
 def daily_log_put(date: str, body: DailyLogIn):
     """PRIVATE — create-or-replace the whole day (upsert)."""
     if SessionLocal is None:
@@ -405,7 +422,7 @@ def daily_log_put(date: str, body: DailyLogIn):
         return {"created": created, **_serialize_daily(row)}
 
 
-@app.patch("/api/daily-log/{date}", dependencies=[Depends(require_admin)])
+@app.patch("/api/daily-log/{date}", dependencies=[Depends(require_daily_writer)])
 def daily_log_patch(date: str, body: DailyLogPatch):
     """PRIVATE — update only the fields sent (404 if the day doesn't exist)."""
     if SessionLocal is None:
@@ -421,7 +438,7 @@ def daily_log_patch(date: str, body: DailyLogPatch):
         return _serialize_daily(row)
 
 
-@app.delete("/api/daily-log/{date}", dependencies=[Depends(require_admin)])
+@app.delete("/api/daily-log/{date}", dependencies=[Depends(require_daily_writer)])
 def daily_log_delete(date: str):
     """PRIVATE — delete one day (404 if it doesn't exist)."""
     if SessionLocal is None:
@@ -435,7 +452,7 @@ def daily_log_delete(date: str):
         return {"deleted": date}
 
 
-@app.post("/api/daily-log/bulk", dependencies=[Depends(require_admin)])
+@app.post("/api/daily-log/bulk", dependencies=[Depends(require_daily_writer)])
 def daily_log_bulk(entries: list[DailyLogFull]):
     """PRIVATE — upsert a whole array in one call. Replaces import_daily_log.py."""
     if SessionLocal is None:
@@ -464,7 +481,7 @@ class IndexBody(BaseModel):
     value: str  # markdown
 
 
-@app.get("/api/index", dependencies=[Depends(require_admin)])
+@app.get("/api/index", dependencies=[Depends(require_daily_writer)])
 def index_get():
     """PRIVATE — the INDEX/TL;DR markdown (empty string if never written)."""
     if SessionLocal is None:
@@ -476,7 +493,7 @@ def index_get():
         return {"value": row.value or "", "updatedAt": row.updated_at}
 
 
-@app.put("/api/index", dependencies=[Depends(require_admin)])
+@app.put("/api/index", dependencies=[Depends(require_daily_writer)])
 def index_put(body: IndexBody):
     """PRIVATE — replace the whole INDEX/TL;DR document (upsert). Stamps today."""
     if SessionLocal is None:
