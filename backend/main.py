@@ -8,7 +8,7 @@ Private full views come later behind auth (S2).
 import os
 import re
 from contextlib import asynccontextmanager
-from datetime import date as date_type
+from datetime import date as date_type, datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -16,7 +16,16 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text
 
 from db import Base, SessionLocal, engine
-from models import Application, DailyLog, LeetcodeProblem, Resume, SDDeck, SiteMeta, StudyNote
+from models import (
+    Application,
+    DailyLog,
+    LeetcodeProblem,
+    Resume,
+    SDDeck,
+    ShadowHistory,
+    SiteMeta,
+    StudyNote,
+)
 
 LEETCODE_TRACK = "0x3f Basic Algorithms"
 LEETCODE_TRACK_URL = "https://space.bilibili.com/206214/channel/collectiondetail?sid=842776"
@@ -393,6 +402,22 @@ def _apply_full(row: DailyLog, body: DailyLogIn) -> None:
     row.tags = body.tags
 
 
+def _shadow(session, kind: str, key: str, op: str, snapshot) -> None:
+    """Append an immutable backup snapshot for a scoped-key-writable change. Added
+    to the same transaction as the write, so the backup commits atomically with it.
+    The scoped key can trigger this (via a normal write) but can never read/alter/
+    delete shadow_history — so the audit trail is safe even from a leaked scoped key."""
+    session.add(
+        ShadowHistory(
+            kind=kind,
+            key=key,
+            op=op,
+            snapshot=snapshot,
+            at=datetime.now(timezone.utc).isoformat(),
+        )
+    )
+
+
 @app.get("/api/daily-log/{date}", dependencies=[Depends(require_daily_writer)])
 def daily_log_get(date: str):
     """PRIVATE — one day's raw stored row (for editing)."""
@@ -417,6 +442,7 @@ def daily_log_put(date: str, body: DailyLogIn):
             row = DailyLog(date=date)
             session.add(row)
         _apply_full(row, body)
+        _shadow(session, "daily_log", date, "put", _serialize_daily(row))
         session.commit()
         session.refresh(row)
         return {"created": created, **_serialize_daily(row)}
@@ -433,6 +459,7 @@ def daily_log_patch(date: str, body: DailyLogPatch):
             raise HTTPException(status_code=404, detail="not found")
         for key, value in body.model_dump(exclude_unset=True).items():
             setattr(row, key, value)
+        _shadow(session, "daily_log", date, "patch", _serialize_daily(row))
         session.commit()
         session.refresh(row)
         return _serialize_daily(row)
@@ -447,6 +474,8 @@ def daily_log_delete(date: str):
         row = session.get(DailyLog, date)
         if row is None:
             raise HTTPException(status_code=404, detail="not found")
+        # snapshot the FULL day before deleting, so a delete is fully recoverable
+        _shadow(session, "daily_log", date, "delete", _serialize_daily(row))
         session.delete(row)
         session.commit()
         return {"deleted": date}
@@ -464,6 +493,7 @@ def daily_log_bulk(entries: list[DailyLogFull]):
                 row = DailyLog(date=entry.date)
                 session.add(row)
             _apply_full(row, entry)
+            _shadow(session, "daily_log", entry.date, "put", _serialize_daily(row))
         session.commit()
         return {"upserted": len(entries)}
 
@@ -507,6 +537,7 @@ def index_put(body: IndexBody):
             session.add(row)
         row.value = body.value
         row.updated_at = today
+        _shadow(session, "index", INDEX_KEY, "put", {"value": row.value, "updatedAt": row.updated_at})
         session.commit()
         return {"created": created, "value": row.value, "updatedAt": row.updated_at}
 
@@ -1179,3 +1210,89 @@ def study_notes_bulk(entries: list[StudyNoteFull]):
             _apply_study_note(row, entry)
         session.commit()
         return {"upserted": len(entries)}
+
+
+# ===========================================================================
+# Shadow backup / recovery (P2·S6+). Append-only history of every scoped-key-
+# writable change (daily_logs + index), written server-side by _shadow(). Both
+# routes are MASTER-ONLY (require_admin) — the scoped DAILYLOG_SECRET can trigger
+# snapshots (by writing) but can never read the history or restore, so a leaked
+# scoped key cannot erase its tracks or roll data back. Use /restore to recover
+# after an accidental or malicious delete/overwrite done with the scoped key.
+# ===========================================================================
+@app.get("/api/shadow/history", dependencies=[Depends(require_admin)])
+def shadow_history(kind: Optional[str] = None, key: Optional[str] = None, limit: int = 100):
+    """MASTER — recent shadow snapshots, newest first. Filter by kind/key. Full
+    snapshot bodies are included only when a specific `key` is requested (keeps the
+    list light)."""
+    if SessionLocal is None:
+        return {"count": 0, "history": []}
+    with SessionLocal() as session:
+        q = select(ShadowHistory).order_by(ShadowHistory.id.desc())
+        if kind:
+            q = q.where(ShadowHistory.kind == kind)
+        if key:
+            q = q.where(ShadowHistory.key == key)
+        q = q.limit(max(1, min(limit, 2000)))
+        rows = session.execute(q).scalars().all()
+        include_snap = key is not None
+        out = []
+        for r in rows:
+            item = {"id": r.id, "kind": r.kind, "key": r.key, "op": r.op, "at": r.at}
+            if include_snap:
+                item["snapshot"] = r.snapshot
+            out.append(item)
+        return {"count": len(out), "history": out}
+
+
+@app.post("/api/shadow/restore", dependencies=[Depends(require_admin)])
+def shadow_restore(kind: Optional[str] = None, key: Optional[str] = None, before: Optional[str] = None):
+    """MASTER — recover daily_logs / index from the shadow history. For each
+    (kind, key) it takes the LATEST snapshot (optionally at-or-before `before`) and
+    upserts that content back. Delete-snapshots carry the full pre-delete state, so
+    a wiped day is fully recovered. No args = restore everything to its last-known
+    content; `before=<ISO ts>` = roll back to a point in time; `kind`/`key` = restore
+    just one thing. (A legitimately-deleted day is resurrected — use kind/key to scope.)"""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        q = select(ShadowHistory).order_by(ShadowHistory.id.asc())
+        if kind:
+            q = q.where(ShadowHistory.kind == kind)
+        if key:
+            q = q.where(ShadowHistory.key == key)
+        if before:
+            q = q.where(ShadowHistory.at <= before)
+        rows = session.execute(q).scalars().all()
+        latest: dict = {}
+        for r in rows:  # ascending → last write per (kind,key) wins; delete carries pre-delete state
+            latest[(r.kind, r.key)] = r
+        restored_days, restored_index = [], []
+        for (k_kind, k_key), r in latest.items():
+            snap = r.snapshot or {}
+            if k_kind == "daily_log":
+                drow = session.get(DailyLog, k_key)
+                if drow is None:
+                    drow = DailyLog(date=k_key)
+                    session.add(drow)
+                drow.week = snap.get("week")
+                drow.done = snap.get("done") or []
+                drow.summary = snap.get("summary")
+                drow.note = snap.get("note")
+                drow.leetcode = snap.get("leetcode") or []
+                drow.sections = snap.get("sections") or {}
+                drow.tags = snap.get("tags") or []
+                restored_days.append(k_key)
+            elif k_kind == "index":
+                srow = session.get(SiteMeta, INDEX_KEY)
+                if srow is None:
+                    srow = SiteMeta(key=INDEX_KEY)
+                    session.add(srow)
+                srow.value = snap.get("value")
+                srow.updated_at = snap.get("updatedAt")
+                restored_index.append(k_key)
+        session.commit()
+        return {
+            "restored": {"daily_log": len(restored_days), "index": len(restored_index)},
+            "dates": sorted(restored_days),
+        }
