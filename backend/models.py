@@ -116,3 +116,21 @@ class SiteMeta(Base):
     key = Column(String(64), primary_key=True)
     value = Column(Text)  # markdown
     updated_at = Column(String(10))  # "YYYY-MM-DD", set server-side on write
+
+
+class ShadowHistory(Base):
+    """Append-only shadow/audit backup for the tables the SCOPED key can write —
+    daily_logs and site_meta (index). The backend appends a snapshot on every such
+    write (put/patch/delete). The scoped DAILYLOG_SECRET has NO endpoint that can
+    read, modify, or delete this table — so even if that key is leaked and abused to
+    delete or overwrite a day, the full history survives here and the master key can
+    restore from it. Grows over time (text-only); prune old rows later if needed."""
+
+    __tablename__ = "shadow_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String(20))  # "daily_log" | "index"
+    key = Column(String(120), index=True)  # the day's date, or "index"
+    op = Column(String(10))  # "put" | "patch" | "delete"
+    snapshot = Column(JSON)  # full state captured for this op (pre-delete state for a delete)
+    at = Column(String(40))  # ISO-8601 UTC timestamp
