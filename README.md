@@ -105,7 +105,7 @@ docs/walkthrough.html        # living dev + deploy walkthrough, one section per 
 ## Roadmap
 
 - **Phase 1 — frontend + deploy pipeline** ✅ · Next.js skeleton on Vercel with Git-push auto-deploy; the four public sections.
-- **Phase 2 — cloud backend** ✅ · FastAPI (Render) + Neon Postgres as the single source of truth; instant sync (dynamic pages); GitHub-gated private views; cloud-only CRUD; résumé integration; a **phone MCP connector**. _(In progress: a public `study-notes` knowledge base.)_
+- **Phase 2 — cloud backend** ✅ · FastAPI (Render) + Neon Postgres as the single source of truth; instant sync (dynamic pages); GitHub-gated private views; cloud-only CRUD; résumé integration; a **phone MCP connector**; then consolidated to a single **Vercel + Render** deploy surface (the legacy static GitHub Pages frontend and the Node v1 backend leftovers retired; one Vercel `Production` environment). _(In progress: a public `study-notes` knowledge base.)_
 - **Phase 3 — DevOps** · Docker + GitHub Actions CI/CD + AWS.
 
 ## Local development
