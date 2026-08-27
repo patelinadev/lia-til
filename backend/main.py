@@ -327,8 +327,15 @@ def _auto_tags(sections: Optional[dict]) -> list[str]:
 
 def _tags_for(row: DailyLog) -> list[str]:
     """Manual tags + rule-based auto tags, de-duplicated & sorted. Served on both
-    public and private (tags are topic labels, never the private content)."""
-    return sorted(set((row.tags or []) + _auto_tags(row.sections)))
+    public and private (tags are topic labels, never the private content).
+
+    Manual tags are English-only: any non-ASCII (e.g. Chinese) manual tag is dropped
+    so it can never reach the PUBLIC tag set — public content is mandatory English and
+    the tag vocabulary is English kebab-case. This guards against any writer (e.g. the
+    application-sync side) storing a stray Chinese tag like "投递". `_auto_tags` already
+    only ever emits English labels, so this filter applies only to the manual `row.tags`."""
+    manual = [t for t in (row.tags or []) if t and t.isascii()]
+    return sorted(set(manual + _auto_tags(row.sections)))
 
 
 def _daily_log_entries(include_sections: bool = False):
