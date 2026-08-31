@@ -664,6 +664,7 @@ def application_put(app_num: int, body: ApplicationBody):
             row = Application(app_num=app_num)
             session.add(row)
         _apply_app(row, body)
+        _shadow(session, "application", str(app_num), "put", _serialize_app(row))
         session.commit()
         session.refresh(row)
         return {"created": created, **_serialize_app(row)}
@@ -679,6 +680,7 @@ def application_patch(app_num: int, body: ApplicationPatch):
             raise HTTPException(status_code=404, detail="not found")
         for key, value in body.model_dump(exclude_unset=True).items():
             setattr(row, key, value)
+        _shadow(session, "application", str(app_num), "patch", _serialize_app(row))
         session.commit()
         session.refresh(row)
         return _serialize_app(row)
@@ -692,6 +694,8 @@ def application_delete(app_num: int):
         row = session.get(Application, app_num)
         if row is None:
             raise HTTPException(status_code=404, detail="not found")
+        # snapshot the FULL row before deleting, so a delete is fully recoverable
+        _shadow(session, "application", str(app_num), "delete", _serialize_app(row))
         session.delete(row)
         session.commit()
         return {"deleted": app_num}
@@ -708,6 +712,7 @@ def application_bulk(entries: list[ApplicationFull]):
                 row = Application(app_num=entry.app_num)
                 session.add(row)
             _apply_app(row, entry)
+            _shadow(session, "application", str(entry.app_num), "put", _serialize_app(row))
         session.commit()
         return {"upserted": len(entries)}
 
@@ -1336,8 +1341,10 @@ def shadow_restore(kind: Optional[str] = None, key: Optional[str] = None, before
 # auth and Render's proxy would otherwise trip DNS-rebinding checks.
 #
 # The tools call the SAME handlers as the HTTP API, so every write still flows
-# through _shadow() append-only backup, and the scope mirrors require_daily_writer:
-# daily-log + index ONLY (never applications / résumé / leetcode / deletes).
+# through _shadow() append-only backup. Scope: daily-log + index full CRUD, PLUS
+# application STATUS updates (list + set_application_status only — for logging a
+# rejection/offer straight from email). Still NEVER exposed via MCP: application
+# create/delete/bulk, résumé, leetcode, or any delete beyond daily-log.
 # Upgrade path (Option 2): swap the URL token for OAuth / a header check; tools
 # stay identical.
 # ===========================================================================
@@ -1357,13 +1364,17 @@ if FastMCP is not None and MCP_TOKEN:
     mcp = FastMCP(
         name="lia-til-daily",
         instructions=(
-            "Manage Lia's private daily learning log (lia-til). These tools cover "
-            "the daily-log entries and the INDEX/TL;DR navigator ONLY. Dates are "
-            "ISO 'YYYY-MM-DD'. To change part of an existing day, prefer "
+            "Manage Lia's private daily learning log (lia-til): the daily-log "
+            "entries, the INDEX/TL;DR navigator, and job-application STATUS. Dates "
+            "are ISO 'YYYY-MM-DD'. To change part of an existing day, prefer "
             "get_daily_log then upsert_daily_log with the merged result — "
             "upsert/patch REPLACE each field you send (sections is replaced "
             "wholesale, never per-heading-merged). To add one section without "
-            "disturbing the others, use append_section."
+            "disturbing the others, use append_section. For applications: these "
+            "tools only READ the ledger and UPDATE an existing application's status "
+            "(e.g. after a rejection email) — find the row with list_applications, "
+            "then set_application_status(appNum, ...). They cannot create, delete, "
+            "or bulk-edit applications."
         ),
     )
 
@@ -1505,6 +1516,48 @@ if FastMCP is not None and MCP_TOKEN:
     def set_index(value: str) -> dict:
         """Replace the whole INDEX/TL;DR markdown document (upsert). Auto-backed up."""
         return index_put(IndexBody(value=value))
+
+    @mcp.tool(annotations=_RO)
+    def list_applications(
+        company: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 30,
+    ) -> list[dict]:
+        """List job applications from the private ledger, newest app_num first, to
+        find the one to update. Optional filters: `company` (case-insensitive
+        substring) and `status` (case-insensitive exact match). Each item is the
+        full row {appNum, company, role, resume, appliedDate, status, notes}. Pass
+        the appNum to set_application_status to update it."""
+        if SessionLocal is None:
+            return []
+        with SessionLocal() as session:
+            stmt = select(Application).order_by(Application.app_num.desc())
+            if company:
+                stmt = stmt.where(Application.company.ilike(f"%{company}%"))
+            if status:
+                stmt = stmt.where(func.lower(Application.status) == status.lower())
+            rows = session.execute(stmt.limit(max(1, limit))).scalars().all()
+            return [_serialize_app(r) for r in rows]
+
+    @mcp.tool(annotations=_WR)
+    def set_application_status(
+        app_num: int,
+        status: str,
+        notes: Optional[str] = None,
+    ) -> dict:
+        """Update ONE existing application's status (e.g. to 'Rejected' after a
+        rejection email), found via list_applications. Only `status` is changed —
+        plus `notes` IF you pass it, which REPLACES the existing notes wholesale
+        (omit it to keep them). Company/role/date/resume are left intact. Auto-
+        backed up via shadow history. Returns the updated row, or
+        {"error": "404: not found"} if that app_num doesn't exist."""
+        provided: dict = {"status": status}
+        if notes is not None:
+            provided["notes"] = notes
+        try:
+            return application_patch(app_num, ApplicationPatch(**provided))
+        except HTTPException as e:
+            return _http_err(e)
 
     # Stateless Streamable-HTTP app, mounted under the secret token prefix.
     # Final endpoint for the connector: https://<host>/mcp/<MCP_TOKEN>/

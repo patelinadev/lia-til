@@ -119,18 +119,19 @@ class SiteMeta(Base):
 
 
 class ShadowHistory(Base):
-    """Append-only shadow/audit backup for the tables the SCOPED key can write —
-    daily_logs and site_meta (index). The backend appends a snapshot on every such
-    write (put/patch/delete). The scoped DAILYLOG_SECRET has NO endpoint that can
-    read, modify, or delete this table — so even if that key is leaked and abused to
-    delete or overwrite a day, the full history survives here and the master key can
+    """Append-only shadow/audit backup for the tables a scoped/connector write can
+    touch — daily_logs, site_meta (index), and applications (status updates via the
+    MCP connector). The backend appends a snapshot on every such write
+    (put/patch/delete). The scoped keys have NO endpoint that can read, modify, or
+    delete this table — so even if such a key (or the MCP URL token) is leaked and
+    abused to overwrite a row, the full history survives here and the master key can
     restore from it. Grows over time (text-only); prune old rows later if needed."""
 
     __tablename__ = "shadow_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    kind = Column(String(20))  # "daily_log" | "index"
-    key = Column(String(120), index=True)  # the day's date, or "index"
+    kind = Column(String(20))  # "daily_log" | "index" | "application"
+    key = Column(String(120), index=True)  # the day's date, "index", or the app_num
     op = Column(String(10))  # "put" | "patch" | "delete"
     snapshot = Column(JSON)  # full state captured for this op (pre-delete state for a delete)
     at = Column(String(40))  # ISO-8601 UTC timestamp
