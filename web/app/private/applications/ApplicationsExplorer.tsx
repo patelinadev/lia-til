@@ -57,6 +57,10 @@ function Highlight({ text, query }: { text: string | null; query: string }) {
 export default function ApplicationsExplorer({ apps }: { apps: FullApplication[] }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("All");
+  // Sort by Last Update: null = natural (App #) order, then desc (newest first), then asc.
+  const [sortDir, setSortDir] = useState<null | "asc" | "desc">(null);
+  const cycleSort = () =>
+    setSortDir((d) => (d === null ? "desc" : d === "desc" ? "asc" : null));
 
   // Statuses present in the data, with counts — for the filter chips.
   const statusCounts = useMemo(() => {
@@ -75,13 +79,27 @@ export default function ApplicationsExplorer({ apps }: { apps: FullApplication[]
   }, [statusCounts]);
 
   const rows = useMemo(() => {
-    return apps.filter((a) => {
+    const filtered = apps.filter((a) => {
       if (status !== "All" && (a.status ?? "—") !== status) return false;
       const blob = [a.company, a.role, a.notes].filter(Boolean).join(" ");
       if (!fuzzyMatch(q, blob)) return false;
       return true;
     });
-  }, [apps, q, status]);
+    if (!sortDir) return filtered;
+    // ISO "YYYY-MM-DD" strings sort chronologically as plain strings. Rows with
+    // no Last Update always sink to the bottom regardless of direction; ties
+    // break by App # so the order is stable.
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const av = a.lastUpdate ?? "";
+      const bv = b.lastUpdate ?? "";
+      if (!av && !bv) return a.appNum - b.appNum;
+      if (!av) return 1;
+      if (!bv) return -1;
+      if (av === bv) return a.appNum - b.appNum;
+      return av < bv ? -dir : dir;
+    });
+  }, [apps, q, status, sortDir]);
 
   // Stats over the currently shown rows.
   const shownByStatus = useMemo(() => {
@@ -153,6 +171,24 @@ export default function ApplicationsExplorer({ apps }: { apps: FullApplication[]
               <th className="px-3 py-2 font-medium">Role</th>
               <th className="px-3 py-2 font-medium">Résumé</th>
               <th className="px-3 py-2 font-medium">Applied</th>
+              <th className="px-3 py-2 font-medium">
+                <button
+                  type="button"
+                  onClick={cycleSort}
+                  aria-label={`Sort by last update${sortDir ? ` (${sortDir === "asc" ? "oldest first" : "newest first"})` : ""}`}
+                  title="Sort by Last Update — click to cycle newest → oldest → off"
+                  className={`group inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-neutral-800 dark:hover:text-neutral-300 ${
+                    sortDir ? "text-neutral-800 dark:text-neutral-200" : ""
+                  }`}
+                >
+                  Last Update
+                  <span className="text-[10px] leading-none">
+                    {sortDir === "asc" ? "▲" : sortDir === "desc" ? "▼" : (
+                      <span className="opacity-30 transition-opacity group-hover:opacity-70">↕</span>
+                    )}
+                  </span>
+                </button>
+              </th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Notes</th>
             </tr>
@@ -169,6 +205,7 @@ export default function ApplicationsExplorer({ apps }: { apps: FullApplication[]
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-neutral-500">{a.resume}</td>
                 <td className="px-3 py-2 font-mono text-xs text-neutral-500">{a.appliedDate}</td>
+                <td className="px-3 py-2 font-mono text-xs text-neutral-500">{a.lastUpdate ?? "—"}</td>
                 <td className="px-3 py-2">
                   <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${pillClass(a.status)}`}>
                     {a.status}

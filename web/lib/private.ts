@@ -7,6 +7,7 @@ export type FullApplication = {
   role: string | null;
   resume: string | null;
   appliedDate: string | null;
+  lastUpdate: string | null;
   status: string | null;
   notes: string | null;
 };

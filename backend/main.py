@@ -113,6 +113,12 @@ async def lifespan(_app: FastAPI):
                     conn.execute(text(f"ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS {col}"))
             except Exception:
                 pass
+        # applications.last_update — added after the table already existed in prod.
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE applications ADD COLUMN IF NOT EXISTS last_update DATE"))
+        except Exception:
+            pass
     # Starlette does NOT auto-run a mounted sub-app's lifespan, so when the MCP
     # server is mounted (bottom of file), nest its lifespan inside ours to start
     # and stop its Streamable-HTTP session manager with the app.
@@ -184,6 +190,7 @@ def applications_full():
                 "role": r.role,
                 "resume": r.resume,
                 "appliedDate": r.applied_date.isoformat() if r.applied_date else None,
+                "lastUpdate": r.last_update.isoformat() if r.last_update else None,
                 "status": r.status,
                 "notes": r.notes,
             }
@@ -603,6 +610,7 @@ class ApplicationBody(BaseModel):
     role: Optional[str] = None
     resume: Optional[str] = None
     applied_date: Optional[date_type] = Field(default=None, alias="appliedDate")
+    last_update: Optional[date_type] = Field(default=None, alias="lastUpdate")
     status: Optional[str] = None
     notes: Optional[str] = None
 
@@ -613,6 +621,7 @@ class ApplicationPatch(BaseModel):
     role: Optional[str] = None
     resume: Optional[str] = None
     applied_date: Optional[date_type] = Field(default=None, alias="appliedDate")
+    last_update: Optional[date_type] = Field(default=None, alias="lastUpdate")
     status: Optional[str] = None
     notes: Optional[str] = None
 
@@ -628,6 +637,7 @@ def _serialize_app(r: Application) -> dict:
         "role": r.role,
         "resume": r.resume,
         "appliedDate": r.applied_date.isoformat() if r.applied_date else None,
+        "lastUpdate": r.last_update.isoformat() if r.last_update else None,
         "status": r.status,
         "notes": r.notes,
     }
@@ -638,6 +648,7 @@ def _apply_app(row: Application, body) -> None:
     row.role = body.role
     row.resume = body.resume
     row.applied_date = body.applied_date
+    row.last_update = body.last_update
     row.status = body.status
     row.notes = body.notes
 
@@ -1546,12 +1557,15 @@ if FastMCP is not None and MCP_TOKEN:
         notes: Optional[str] = None,
     ) -> dict:
         """Update ONE existing application's status (e.g. to 'Rejected' after a
-        rejection email), found via list_applications. Only `status` is changed —
-        plus `notes` IF you pass it, which REPLACES the existing notes wholesale
-        (omit it to keep them). Company/role/date/resume are left intact. Auto-
-        backed up via shadow history. Returns the updated row, or
-        {"error": "404: not found"} if that app_num doesn't exist."""
-        provided: dict = {"status": status}
+        rejection email), found via list_applications. `status` is changed and
+        `lastUpdate` is bumped to today (the status-signal date) — plus `notes`
+        IF you pass it, which REPLACES the existing notes wholesale (omit it to
+        keep them). Company/role/appliedDate/resume are left intact. The ledger
+        file remains the source of truth: the next `sync_lia_til.py` push
+        overwrites lastUpdate with the file's value. Auto-backed up via shadow
+        history. Returns the updated row, or {"error": "404: not found"} if that
+        app_num doesn't exist."""
+        provided: dict = {"status": status, "last_update": date_type.today()}
         if notes is not None:
             provided["notes"] = notes
         try:

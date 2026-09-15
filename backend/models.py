@@ -13,7 +13,8 @@ class Application(Base):
     company = Column(String(200))
     role = Column(Text)
     resume = Column(String(50))
-    applied_date = Column(Date)
+    applied_date = Column(Date)  # the submit date; never changes after it's set
+    last_update = Column(Date)  # date of the row's most recent status signal (OA/call/onsite/offer/reject); = applied_date on submission
     status = Column(String(50))
     notes = Column(Text)
 
