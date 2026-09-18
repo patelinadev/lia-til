@@ -39,6 +39,11 @@ class Application(Base):
         ForeignKey("companies.id", name="applications_company_id_fkey"),
         nullable=True,
     )
+    # R8 hard identifier — the posting / ATS URL actually applied to. The ONLY
+    # evidence that two applications are the same req (company+title is not).
+    # Set by the create endpoint; deliberately NOT part of the legacy PUT/bulk
+    # full-overwrite path, so a file sync can never null it.
+    apply_url = Column(Text)
 
 
 class Company(Base):
