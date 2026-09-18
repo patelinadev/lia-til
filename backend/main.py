@@ -8,7 +8,7 @@ Private full views come later behind auth (S2).
 import os
 import re
 from contextlib import asynccontextmanager
-from datetime import date as date_type, datetime, timezone
+from datetime import date as date_type, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -18,6 +18,8 @@ from sqlalchemy import func, select, text
 from db import Base, SessionLocal, engine
 from models import (
     Application,
+    ApplicationStatusHistory,
+    Company,
     DailyLog,
     LeetcodeProblem,
     Resume,
@@ -25,6 +27,7 @@ from models import (
     ShadowHistory,
     SiteMeta,
     StudyNote,
+    ToApply,
 )
 
 LEETCODE_TRACK = "0x3f Basic Algorithms"
@@ -139,6 +142,12 @@ async def lifespan(_app: FastAPI):
                         "END IF; END $$;"
                     )
                 )
+        except Exception:
+            pass
+        # applications.apply_url — R8 hard identifier for dedup (Phase 3).
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE applications ADD COLUMN IF NOT EXISTS apply_url TEXT"))
         except Exception:
             pass
     # Starlette does NOT auto-run a mounted sub-app's lifespan, so when the MCP
@@ -662,6 +671,8 @@ def _serialize_app(r: Application) -> dict:
         "lastUpdate": r.last_update.isoformat() if r.last_update else None,
         "status": r.status,
         "notes": r.notes,
+        "companyId": r.company_id,
+        "applyUrl": r.apply_url,
     }
 
 
@@ -748,6 +759,372 @@ def application_bulk(entries: list[ApplicationFull]):
             _shadow(session, "application", str(entry.app_num), "put", _serialize_app(row))
         session.commit()
         return {"upserted": len(entries)}
+
+
+# ===========================================================================
+# Phase 3 — the API is the only counter (DB as source of truth).
+#   POST  /api/applications                → T8: create; assigns the next App#
+#   PATCH /api/applications/{n}/status     → T9: status change + history row
+#   GET/PUT /api/to_apply, PATCH /{id}     → T10: today's On Deck queue
+# Rules baked in here so no client can break them: App# is assigned atomically
+# inside the transaction (never by the caller); duplicates are judged ONLY by
+# the hard identifier apply_url (R8); every status change writes ONE
+# application_status_history row in the SAME transaction (D6); "Last Update"
+# is derived from that history (the legacy last_update column is kept in sync
+# only until the website reads history directly).
+# ===========================================================================
+VALID_TO_APPLY_STATUS = {"queued", "applied", "skipped"}
+
+
+def _find_or_create_company(session, name: Optional[str], domain: Optional[str]) -> Optional[Company]:
+    """The company's identity (D8). Match by `domain` when given (the stable key),
+    else by case-insensitive exact name; create when nothing matches. `name` is
+    only a label — two different "Clark"s stay apart because their domains differ."""
+    name = (name or "").strip()
+    domain = (domain or "").strip().lower() or None
+    if not name and not domain:
+        return None
+    row = None
+    if domain:
+        row = session.execute(select(Company).where(Company.domain == domain)).scalar_one_or_none()
+    if row is None and name:
+        row = session.execute(
+            select(Company).where(func.lower(Company.name) == name.lower(), Company.domain.is_(None))
+        ).scalar_one_or_none()
+        if row is None and not domain:
+            row = session.execute(select(Company).where(func.lower(Company.name) == name.lower())).scalar_one_or_none()
+    if row is None:
+        row = Company(name=name or domain, domain=domain)
+        session.add(row)
+        session.flush()
+    elif domain and row.domain is None:
+        row.domain = domain  # learned the stable key for a name-only row
+    return row
+
+
+def _cap_warning(session, company: Optional[Company], today: date_type) -> Optional[str]:
+    """Per-company application cap (e.g. Ramp = 2 per 60 days). Warns, never blocks —
+    the operator decides (R8)."""
+    if company is None or not company.application_cap or not company.cap_window_days:
+        return None
+    since = today - timedelta(days=company.cap_window_days)
+    n = session.execute(
+        select(func.count()).select_from(Application).where(
+            Application.company_id == company.id, Application.applied_date >= since
+        )
+    ).scalar_one()
+    if n >= company.application_cap:
+        return (
+            f"cap: {company.name} allows {company.application_cap} applications per "
+            f"{company.cap_window_days} days and already has {n} since {since.isoformat()}"
+        )
+    return None
+
+
+def _next_app_num(session) -> int:
+    """Gap-free App# assigned INSIDE the transaction (R6). On Postgres the table is
+    locked for the duration so two concurrent creates can never pick the same
+    number; SQLite (tests) has no LOCK TABLE and is single-writer anyway."""
+    if session.bind.dialect.name == "postgresql":
+        session.execute(text("LOCK TABLE applications IN SHARE ROW EXCLUSIVE MODE"))
+    current = session.execute(select(func.max(Application.app_num))).scalar_one()
+    return (current or 0) + 1
+
+
+def _record_status(session, row: Application, new_status: str, source: str, note: Optional[str]) -> bool:
+    """Change an application's status and append ONE history row, same transaction
+    (D6). Returns False (no history row) when the status is unchanged."""
+    new_status = (new_status or "").strip()
+    if not new_status:
+        raise HTTPException(status_code=422, detail="status required")
+    if (row.status or "") == new_status:
+        return False
+    session.add(
+        ApplicationStatusHistory(
+            app_num=row.app_num,
+            old_status=row.status,
+            new_status=new_status,
+            source=source,
+            note=note,
+        )
+    )
+    row.status = new_status
+    row.last_update = date_type.today()  # legacy column, kept in sync until readers use history
+    return True
+
+
+class ApplicationCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    company: Optional[str] = None
+    domain: Optional[str] = None
+    role: Optional[str] = None
+    resume: Optional[str] = None
+    applied_date: Optional[date_type] = Field(default=None, alias="appliedDate")
+    status: str = "Applied"
+    notes: Optional[str] = None
+    apply_url: Optional[str] = Field(default=None, alias="applyUrl")
+    source: str = "desktop-claude"
+    # Promote a row from today's On Deck queue: fills company/role/url/resume from it
+    # and marks that queue row applied — all in this one transaction.
+    to_apply_id: Optional[int] = Field(default=None, alias="toApplyId")
+
+
+class ApplicationStatusIn(BaseModel):
+    status: str
+    source: str = "desktop-claude"
+    note: Optional[str] = None
+
+
+def _create_application(body: ApplicationCreate) -> dict:
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    today = date_type.today()
+    with SessionLocal() as session:
+        queue_row = None
+        company_name, domain = body.company, body.domain
+        role, resume, apply_url, notes = body.role, body.resume, body.apply_url, body.notes
+        if body.to_apply_id is not None:
+            queue_row = session.get(ToApply, body.to_apply_id)
+            if queue_row is None:
+                raise HTTPException(status_code=404, detail="to_apply row not found")
+            if queue_row.company_id is not None and not company_name:
+                c = session.get(Company, queue_row.company_id)
+                if c is not None:
+                    company_name, domain = c.name, c.domain
+            role = role or queue_row.role
+            resume = resume or queue_row.resume
+            apply_url = apply_url or queue_row.apply_url
+            notes = notes if notes is not None else queue_row.note
+        apply_url = (apply_url or "").strip() or None
+        if not role:
+            raise HTTPException(status_code=422, detail="role required")
+        # R8: a duplicate is ONLY a matching hard identifier.
+        if apply_url:
+            dup = session.execute(select(Application).where(Application.apply_url == apply_url)).scalar_one_or_none()
+            if dup is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail={"error": "duplicate", "existingAppNum": dup.app_num, "applyUrl": apply_url},
+                )
+        company = _find_or_create_company(session, company_name, domain)
+        warnings = []
+        w = _cap_warning(session, company, today)
+        if w:
+            warnings.append(w)
+        row = Application(
+            app_num=_next_app_num(session),
+            company=(company.name if company else company_name),  # legacy text, kept until Phase 5
+            company_id=(company.id if company else None),
+            role=role,
+            resume=resume,
+            applied_date=body.applied_date or today,
+            last_update=body.applied_date or today,
+            status=body.status,
+            notes=notes,
+            apply_url=apply_url,
+        )
+        session.add(row)
+        session.flush()
+        session.add(
+            ApplicationStatusHistory(
+                app_num=row.app_num, old_status=None, new_status=row.status, source=body.source, note=None
+            )
+        )
+        if queue_row is not None:
+            queue_row.status = "applied"
+        _shadow(session, "application", str(row.app_num), "put", _serialize_app(row))
+        session.commit()
+        session.refresh(row)
+        return {"created": True, "warnings": warnings, **_serialize_app(row)}
+
+
+@app.post("/api/applications", dependencies=[Depends(require_admin)])
+def application_create(body: ApplicationCreate):
+    """T8 — the ONLY way a new application (and its App#) comes into existence."""
+    return _create_application(body)
+
+
+def _set_status_core(app_num: int, status: str, source: str, note: Optional[str], replace_notes: Optional[str] = None) -> dict:
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(Application, app_num)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        changed = _record_status(session, row, status, source, note)
+        if replace_notes is not None:
+            row.notes = replace_notes
+        _shadow(session, "application", str(app_num), "patch", _serialize_app(row))
+        session.commit()
+        session.refresh(row)
+        return {"changed": changed, **_serialize_app(row)}
+
+
+@app.patch("/api/applications/{app_num}/status", dependencies=[Depends(require_admin)])
+def application_set_status(app_num: int, body: ApplicationStatusIn):
+    """T9 — status change + ONE history row, same transaction. Any client may call
+    this (desktop / phone / website); `source` says which."""
+    return _set_status_core(app_num, body.status, body.source, body.note)
+
+
+@app.get("/api/applications/{app_num}/history", dependencies=[Depends(require_admin)])
+def application_history(app_num: int):
+    """The status timeline for one application, oldest first. "Last Update" =
+    the last row's changedAt."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        rows = session.execute(
+            select(ApplicationStatusHistory)
+            .where(ApplicationStatusHistory.app_num == app_num)
+            .order_by(ApplicationStatusHistory.changed_at, ApplicationStatusHistory.id)
+        ).scalars().all()
+        return [
+            {
+                "id": h.id,
+                "appNum": h.app_num,
+                "oldStatus": h.old_status,
+                "newStatus": h.new_status,
+                "changedAt": h.changed_at.isoformat() if h.changed_at else None,
+                "source": h.source,
+                "note": h.note,
+            }
+            for h in rows
+        ]
+
+
+# ----- T10: to_apply (today's On Deck queue) -----
+class ToApplyRowIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    company: str
+    domain: Optional[str] = None
+    role: str
+    location: Optional[str] = None
+    apply_url: str = Field(alias="applyUrl")
+    resume: Optional[str] = None
+    note: Optional[str] = None
+    reach: bool = False
+    fresh: bool = False
+
+
+class ToApplyPut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    queue_date: date_type = Field(alias="queueDate")
+    rows: list[ToApplyRowIn]
+
+
+class ToApplyPatch(BaseModel):
+    status: Optional[str] = None
+    note: Optional[str] = None
+
+
+def _serialize_to_apply(r: ToApply, company_name: Optional[str]) -> dict:
+    return {
+        "id": r.id,
+        "queueDate": r.queue_date.isoformat() if r.queue_date else None,
+        "company": company_name,
+        "companyId": r.company_id,
+        "role": r.role,
+        "location": r.location,
+        "applyUrl": r.apply_url,
+        "resume": r.resume,
+        "note": r.note,
+        "reach": bool(r.reach),
+        "fresh": bool(r.fresh),
+        "status": r.status,
+        "createdAt": r.created_at.isoformat() if r.created_at else None,
+    }
+
+
+@app.get("/api/to_apply", dependencies=[Depends(require_daily_writer)])
+def to_apply_get(date: Optional[str] = None):
+    """Today's queue (or the newest queue day when `date` is omitted — if the
+    sourcing run hasn't happened yet you get yesterday's, labelled by queueDate).
+    Scoped-key readable so Bridge never needs the master secret."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        if date:
+            try:
+                qd = date_type.fromisoformat(date)
+            except ValueError:
+                raise HTTPException(status_code=422, detail="date must be YYYY-MM-DD")
+        else:
+            qd = session.execute(select(func.max(ToApply.queue_date))).scalar_one()
+        if qd is None:
+            return {"queueDate": None, "rows": []}
+        rows = session.execute(
+            select(ToApply, Company.name)
+            .outerjoin(Company, ToApply.company_id == Company.id)
+            .where(ToApply.queue_date == qd)
+            .order_by(ToApply.id)
+        ).all()
+        return {"queueDate": qd.isoformat(), "rows": [_serialize_to_apply(r, name) for r, name in rows]}
+
+
+@app.put("/api/to_apply", dependencies=[Depends(require_admin)])
+def to_apply_put(body: ToApplyPut):
+    """The sourcing run writes the day's queue. Upsert by (queueDate, applyUrl):
+    existing rows keep their STATUS (a tick made in Bridge survives a re-run);
+    queued rows absent from the payload are deleted (the job closed); rows already
+    applied/skipped are never deleted."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        seen, inserted, updated = set(), 0, 0
+        for r in body.rows:
+            url = r.apply_url.strip()
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            company = _find_or_create_company(session, r.company, r.domain)
+            row = session.execute(
+                select(ToApply).where(ToApply.queue_date == body.queue_date, ToApply.apply_url == url)
+            ).scalar_one_or_none()
+            if row is None:
+                row = ToApply(queue_date=body.queue_date, apply_url=url, status="queued")
+                session.add(row)
+                inserted += 1
+            else:
+                updated += 1
+            row.company_id = company.id if company else None
+            row.role, row.location, row.resume = r.role, r.location, r.resume
+            row.note, row.reach, row.fresh = r.note, r.reach, r.fresh
+        stale = session.execute(
+            select(ToApply).where(ToApply.queue_date == body.queue_date, ToApply.status == "queued")
+        ).scalars().all()
+        deleted = 0
+        for row in stale:
+            if row.apply_url not in seen:
+                session.delete(row)
+                deleted += 1
+        session.commit()
+        return {"queueDate": body.queue_date.isoformat(), "inserted": inserted, "updated": updated, "deleted": deleted}
+
+
+@app.patch("/api/to_apply/{row_id}", dependencies=[Depends(require_daily_writer)])
+def to_apply_patch(row_id: int, body: ToApplyPatch):
+    """Bridge tick: queued → applied / skipped (or back). Does NOT mint an App# —
+    only POST /api/applications does (single-writer rule); pass toApplyId there to
+    promote the row. Scoped write → shadowed like every other scoped write."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(ToApply, row_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        if body.status is not None:
+            if body.status not in VALID_TO_APPLY_STATUS:
+                raise HTTPException(status_code=422, detail=f"status must be one of {sorted(VALID_TO_APPLY_STATUS)}")
+            row.status = body.status
+        if body.note is not None:
+            row.note = body.note
+        name = session.get(Company, row.company_id).name if row.company_id else None
+        snap = _serialize_to_apply(row, name)
+        _shadow(session, "to_apply", str(row_id), "patch", snap)
+        session.commit()
+        session.refresh(row)
+        return _serialize_to_apply(row, name)
 
 
 # ===========================================================================
@@ -1580,18 +1957,16 @@ if FastMCP is not None and MCP_TOKEN:
     ) -> dict:
         """Update ONE existing application's status (e.g. to 'Rejected' after a
         rejection email), found via list_applications. `status` is changed and
-        `lastUpdate` is bumped to today (the status-signal date) — plus `notes`
+        `lastUpdate` is bumped to today (the status-signal date) and ONE row is
+        appended to the status history with source="phone-mcp" — plus `notes`
         IF you pass it, which REPLACES the existing notes wholesale (omit it to
-        keep them). Company/role/appliedDate/resume are left intact. The ledger
-        file remains the source of truth: the next `sync_lia_til.py` push
-        overwrites lastUpdate with the file's value. Auto-backed up via shadow
-        history. Returns the updated row, or {"error": "404: not found"} if that
-        app_num doesn't exist."""
-        provided: dict = {"status": status, "last_update": date_type.today()}
-        if notes is not None:
-            provided["notes"] = notes
+        keep them). Company/role/appliedDate/resume are left intact. Until the
+        file→DB sync is retired, a later `sync_lia_til.py` push can still
+        overwrite status/lastUpdate with the file's values (the history row
+        survives). Auto-backed up via shadow history. Returns the updated row,
+        or {"error": "404: not found"} if that app_num doesn't exist."""
         try:
-            return application_patch(app_num, ApplicationPatch(**provided))
+            return _set_status_core(app_num, status, "phone-mcp", notes, replace_notes=notes)
         except HTTPException as e:
             return _http_err(e)
 
