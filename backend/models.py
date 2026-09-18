@@ -1,7 +1,20 @@
 """ORM models. The applications table holds the FULL private ledger; the public
 API only ever returns aggregate counts derived from it."""
 
-from sqlalchemy import JSON, Column, Date, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 
 from db import Base
 
@@ -17,6 +30,80 @@ class Application(Base):
     last_update = Column(Date)  # date of the row's most recent status signal (OA/call/onsite/offer/reject); = applied_date on submission
     status = Column(String(50))
     notes = Column(Text)
+    # D8 — the company's IDENTITY (FK → companies.id). The legacy free-text
+    # `company` column above stays until the backfill is verified, then is
+    # dropped (Phase 5). Added to prod via the lifespan ALTER in main.py, since
+    # create_all never ALTERs an existing table.
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id", name="applications_company_id_fkey"),
+        nullable=True,
+    )
+
+
+class Company(Base):
+    """One row per company — the company's IDENTITY (D8). `name` is only a display
+    label; `domain` (website host or ATS board slug, e.g. jobs.ashbyhq.com/clark)
+    is the stable unique matching key, so two different "Clark"s never collide
+    and one Amazon spelled two ways never splits. Optional per-company
+    application cap (e.g. Ramp = 2 per 60 days) so the create endpoint can warn
+    before the quota is burned."""
+
+    __tablename__ = "companies"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(200), nullable=False)
+    domain = Column(String(200), unique=True)  # nullable: may be unresolved at first
+    application_cap = Column(Integer)  # nullable — e.g. 2
+    cap_window_days = Column(Integer)  # nullable — e.g. 60
+
+
+class ApplicationStatusHistory(Base):
+    """Append-only status TIMELINE for one application (D6): one row per status
+    change, stamped by the database (`changed_at DEFAULT now()`). "Last Update"
+    is DERIVED as the newest changed_at for the app — never stored on
+    applications. Distinct from shadow_history, which is the whole-row security
+    BACKUP (restore), not a queryable timeline. Status changes only — not every
+    field edit."""
+
+    __tablename__ = "application_status_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    app_num = Column(
+        Integer,
+        ForeignKey("applications.app_num", name="app_status_history_app_num_fkey"),
+        index=True,
+        nullable=False,
+    )
+    old_status = Column(String(50))  # NULL on the initial / seeded row
+    new_status = Column(String(50), nullable=False)
+    changed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    source = Column(String(40))  # desktop-claude | phone-mcp | website-admin | migration
+    note = Column(Text)  # rejection text, OA link, ...
+
+
+class ToApply(Base):
+    """Today's On Deck queue (D9 / T4) — replaces to_apply.md and the daily git
+    branches. Rewritten every sourcing run; Bridge reads it and ticks rows
+    (queued → applied / skipped) through the API. company_id is the identity
+    (D8); the API find-or-creates the company on write. One URL may appear at
+    most once per queue day (carried rows re-appear on later days)."""
+
+    __tablename__ = "to_apply"
+    __table_args__ = (UniqueConstraint("queue_date", "apply_url", name="to_apply_day_url_uq"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    queue_date = Column(Date, nullable=False, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id", name="to_apply_company_id_fkey"))
+    role = Column(Text, nullable=False)
+    location = Column(Text)
+    apply_url = Column(Text, nullable=False)
+    resume = Column(String(50))  # archetype, e.g. Fullstack_NYC
+    note = Column(Text)
+    reach = Column(Boolean, server_default=text("false"), nullable=False)
+    fresh = Column(Boolean, server_default=text("false"), nullable=False)
+    status = Column(String(20), server_default="queued", nullable=False)  # queued | applied | skipped
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class LeetcodeProblem(Base):

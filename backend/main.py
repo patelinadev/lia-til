@@ -119,6 +119,28 @@ async def lifespan(_app: FastAPI):
                 conn.execute(text("ALTER TABLE applications ADD COLUMN IF NOT EXISTS last_update DATE"))
         except Exception:
             pass
+        # Phase 1 (DB as source of truth, D8): applications.company_id → companies.id.
+        # create_all created the new `companies` table above but never ALTERs the
+        # existing applications table, so add the column + FK constraint here.
+        # Both idempotent; the DO block guards the constraint by name.
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE applications ADD COLUMN IF NOT EXISTS company_id INTEGER"))
+        except Exception:
+            pass
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "DO $$ BEGIN "
+                        "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'applications_company_id_fkey') THEN "
+                        "ALTER TABLE applications ADD CONSTRAINT applications_company_id_fkey "
+                        "FOREIGN KEY (company_id) REFERENCES companies(id); "
+                        "END IF; END $$;"
+                    )
+                )
+        except Exception:
+            pass
     # Starlette does NOT auto-run a mounted sub-app's lifespan, so when the MCP
     # server is mounted (bottom of file), nest its lifespan inside ours to start
     # and stop its Streamable-HTTP session manager with the app.
