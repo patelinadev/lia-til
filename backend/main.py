@@ -150,6 +150,12 @@ async def lifespan(_app: FastAPI):
                 conn.execute(text("ALTER TABLE applications ADD COLUMN IF NOT EXISTS apply_url TEXT"))
         except Exception:
             pass
+        # to_apply.backup — reserve rows; the table already exists in prod.
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE to_apply ADD COLUMN IF NOT EXISTS backup BOOLEAN NOT NULL DEFAULT false"))
+        except Exception:
+            pass
     # Starlette does NOT auto-run a mounted sub-app's lifespan, so when the MCP
     # server is mounted (bottom of file), nest its lifespan inside ours to start
     # and stop its Streamable-HTTP session manager with the app.
@@ -1005,6 +1011,7 @@ class ToApplyRowIn(BaseModel):
     note: Optional[str] = None
     reach: bool = False
     fresh: bool = False
+    backup: bool = False
 
 
 class ToApplyPut(BaseModel):
@@ -1031,6 +1038,7 @@ def _serialize_to_apply(r: ToApply, company_name: Optional[str]) -> dict:
         "note": r.note,
         "reach": bool(r.reach),
         "fresh": bool(r.fresh),
+        "backup": bool(r.backup),
         "status": r.status,
         "createdAt": r.created_at.isoformat() if r.created_at else None,
     }
@@ -1089,7 +1097,7 @@ def to_apply_put(body: ToApplyPut):
                 updated += 1
             row.company_id = company.id if company else None
             row.role, row.location, row.resume = r.role, r.location, r.resume
-            row.note, row.reach, row.fresh = r.note, r.reach, r.fresh
+            row.note, row.reach, row.fresh, row.backup = r.note, r.reach, r.fresh, r.backup
         stale = session.execute(
             select(ToApply).where(ToApply.queue_date == body.queue_date, ToApply.status == "queued")
         ).scalars().all()
@@ -1125,6 +1133,96 @@ def to_apply_patch(row_id: int, body: ToApplyPatch):
         session.commit()
         session.refresh(row)
         return _serialize_to_apply(row, name)
+
+
+class ToApplyApplyIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    applied_date: Optional[date_type] = Field(default=None, alias="appliedDate")
+    source: str = "bridge"
+
+
+@app.post("/api/to_apply/{row_id}/apply", dependencies=[Depends(require_daily_writer)])
+def to_apply_apply(row_id: int, body: Optional[ToApplyApplyIn] = None):
+    """D10 — one click in Bridge: promote THIS queue row into an application. The
+    API mints the App#, copies company/role/url/resume from the row, writes the
+    first history row and marks the row applied, all in one transaction. Scoped
+    key on purpose: it can only turn an existing queue row into an application,
+    never create an arbitrary one. A second click is a 409 with existingAppNum
+    (dedup on apply_url), so it is safe to retry."""
+    body = body or ToApplyApplyIn()
+    return _create_application(
+        ApplicationCreate(toApplyId=row_id, appliedDate=body.applied_date, source=body.source)
+    )
+
+
+# ---------------------------------------------------------------------------
+# One-shot Phase 2 backfill (migration day). Idempotent — safe to re-run; a
+# dryRun reports what WOULD change and commits nothing. Remove after cutover.
+# ---------------------------------------------------------------------------
+class MigratePhase2In(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    dry_run: bool = Field(default=True, alias="dryRun")
+    # legacy company string -> canonical company name (e.g. "Amazon (Annapurna Labs)" -> "Amazon")
+    company_aliases: dict[str, str] = Field(default_factory=dict, alias="companyAliases")
+    # app_num -> exact posting URL, only where it is known for certain
+    apply_urls: dict[int, str] = Field(default_factory=dict, alias="applyUrls")
+
+
+@app.post("/api/admin/migrate/phase2", dependencies=[Depends(require_admin)])
+def migrate_phase2(body: MigratePhase2In):
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+
+    def _noon(d):  # midday UTC so the calendar date survives any timezone
+        return datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc) if d else None
+
+    with SessionLocal() as session:
+        apps = session.execute(select(Application).order_by(Application.app_num)).scalars().all()
+        have_history = {
+            n for (n,) in session.execute(select(ApplicationStatusHistory.app_num).distinct()).all()
+        }
+        companies_before = session.execute(select(func.count()).select_from(Company)).scalar_one()
+        linked = urls = seeded_apps = history_rows = 0
+        for a in apps:
+            if a.company_id is None and (a.company or "").strip():
+                canonical = body.company_aliases.get(a.company, a.company)
+                c = _find_or_create_company(session, canonical, None)
+                a.company_id = c.id
+                linked += 1
+            url = (body.apply_urls.get(a.app_num) or "").strip()
+            if url and not a.apply_url:
+                a.apply_url = url
+                urls += 1
+            if a.app_num not in have_history:
+                session.add(ApplicationStatusHistory(
+                    app_num=a.app_num, old_status=None, new_status="Applied",
+                    changed_at=_noon(a.applied_date) or datetime.now(timezone.utc), source="migration"))
+                history_rows += 1
+                if (a.status or "Applied") != "Applied":
+                    session.add(ApplicationStatusHistory(
+                        app_num=a.app_num, old_status="Applied", new_status=a.status,
+                        changed_at=_noon(a.last_update or a.applied_date) or datetime.now(timezone.utc),
+                        source="migration"))
+                    history_rows += 1
+                seeded_apps += 1
+        session.flush()
+        companies_after = session.execute(select(func.count()).select_from(Company)).scalar_one()
+        result = {
+            "dryRun": body.dry_run,
+            "applications": len(apps),
+            "linkedToCompany": linked,
+            "companiesCreated": companies_after - companies_before,
+            "companiesTotal": companies_after,
+            "applyUrlsSet": urls,
+            "applicationsSeededWithHistory": seeded_apps,
+            "historyRowsInserted": history_rows,
+            "stillUnlinked": sum(1 for a in apps if a.company_id is None),
+        }
+        if body.dry_run:
+            session.rollback()
+        else:
+            session.commit()
+        return result
 
 
 # ===========================================================================
