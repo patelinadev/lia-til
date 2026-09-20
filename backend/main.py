@@ -654,6 +654,8 @@ class ApplicationBody(BaseModel):
 
 class ApplicationPatch(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+    # who is writing — recorded on the history row when `status` changes
+    source: Optional[str] = None
     company: Optional[str] = None
     role: Optional[str] = None
     resume: Optional[str] = None
@@ -709,15 +711,23 @@ def application_put(app_num: int, body: ApplicationBody):
         raise HTTPException(status_code=503, detail="db unavailable")
     with SessionLocal() as session:
         row = session.get(Application, app_num)
-        created = row is None
-        if created:
-            row = Application(app_num=app_num)
-            session.add(row)
-        _apply_app(row, body)
+        if row is None:
+            # The caller never picks an App# — that is how 256/257 got used twice.
+            raise HTTPException(
+                status_code=409,
+                detail="PUT updates an existing application only; create with POST /api/applications (the API assigns the App#)",
+            )
+        new_status = body.status
+        body_no_status = body.model_copy(update={"status": row.status})
+        _apply_app(row, body_no_status)
+        if new_status is not None:
+            _record_status(session, row, new_status, "api", None)
+            if body.last_update is not None:
+                row.last_update = body.last_update  # an explicit date wins over "today"
         _shadow(session, "application", str(app_num), "put", _serialize_app(row))
         session.commit()
         session.refresh(row)
-        return {"created": created, **_serialize_app(row)}
+        return {"created": False, **_serialize_app(row)}
 
 
 @app.patch("/api/applications/{app_num}", dependencies=[Depends(require_admin)])
@@ -728,7 +738,14 @@ def application_patch(app_num: int, body: ApplicationPatch):
         row = session.get(Application, app_num)
         if row is None:
             raise HTTPException(status_code=404, detail="not found")
-        for key, value in body.model_dump(exclude_unset=True).items():
+        data = body.model_dump(exclude_unset=True)
+        source = data.pop("source", None) or "api"
+        new_status = data.pop("status", None)
+        # A status change ALWAYS goes through the timeline (D6) — whichever client
+        # sends it and whichever route it uses, there is no way to skip the history row.
+        if new_status is not None:
+            _record_status(session, row, new_status, source, None)
+        for key, value in data.items():  # explicit fields (incl. lastUpdate) win
             setattr(row, key, value)
         _shadow(session, "application", str(app_num), "patch", _serialize_app(row))
         session.commit()
