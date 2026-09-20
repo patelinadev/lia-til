@@ -107,6 +107,9 @@ class ToApply(Base):
     note = Column(Text)
     reach = Column(Boolean, server_default=text("false"), nullable=False)
     fresh = Column(Boolean, server_default=text("false"), nullable=False)
+    # Reserve row ("needs manual verify before applying") — shown apart from the
+    # primary queue and never counted in it.
+    backup = Column(Boolean, server_default=text("false"), nullable=False)
     status = Column(String(20), server_default="queued", nullable=False)  # queued | applied | skipped
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
