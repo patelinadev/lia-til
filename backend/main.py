@@ -799,28 +799,50 @@ VALID_TO_APPLY_STATUS = {"queued", "applied", "skipped"}
 
 
 def _find_or_create_company(session, name: Optional[str], domain: Optional[str]) -> Optional[Company]:
-    """The company's identity (D8). Match by `domain` when given (the stable key),
-    else by case-insensitive exact name; create when nothing matches. `name` is
-    only a label — two different "Clark"s stay apart because their domains differ."""
+    """The company's identity (D8). `name` is a label; `domain` is a hint that keeps
+    spelling variants together and same-named companies apart. Order matters:
+
+    1. Same name (case-insensitive) AND a compatible domain (equal, or one side
+       unknown) → that company. Two different "Clark"s stay apart because their
+       known domains differ.
+    2. Otherwise a company that already owns this domain → that company (the
+       caller used a different spelling of a known employer).
+    3. Otherwise create it.
+
+    A domain is only ever WRITTEN when no other company owns it. Job-board hosts
+    are shared ("amazon.jobs" serves Amazon, Audible, Twitch…), so a second
+    company claiming the same host keeps domain NULL instead of violating the
+    unique constraint — that collision took down a whole queue PUT on 2026-09-21.
+    Pending changes are flushed so later rows in the same request see them
+    (the session runs with autoflush off)."""
     name = (name or "").strip()
     domain = (domain or "").strip().lower() or None
     if not name and not domain:
         return None
+
+    def _owner(d):
+        return session.execute(select(Company).where(Company.domain == d)).scalar_one_or_none() if d else None
+
     row = None
-    if domain:
-        row = session.execute(select(Company).where(Company.domain == domain)).scalar_one_or_none()
-    if row is None and name:
-        row = session.execute(
-            select(Company).where(func.lower(Company.name) == name.lower(), Company.domain.is_(None))
-        ).scalar_one_or_none()
-        if row is None and not domain:
-            row = session.execute(select(Company).where(func.lower(Company.name) == name.lower())).scalar_one_or_none()
+    if name:
+        same_name = session.execute(select(Company).where(func.lower(Company.name) == name.lower())).scalars().all()
+        for c in same_name:  # exact domain match wins over an unknown-domain row
+            if domain and c.domain == domain:
+                row = c
+                break
+        if row is None:
+            for c in same_name:
+                if c.domain is None or domain is None:
+                    row = c
+                    break
+    if row is None and domain:
+        row = _owner(domain)
     if row is None:
-        row = Company(name=name or domain, domain=domain)
+        row = Company(name=name or domain, domain=domain if _owner(domain) is None else None)
         session.add(row)
-        session.flush()
-    elif domain and row.domain is None:
-        row.domain = domain  # learned the stable key for a name-only row
+    elif domain and row.domain is None and _owner(domain) is None:
+        row.domain = domain  # learned the stable key, and nobody else owns it
+    session.flush()
     return row
 
 
@@ -1186,6 +1208,8 @@ def _queue_put_from_tool(queue_date: str, rows: list) -> dict:
         return to_apply_put(body)
     except HTTPException as e:
         return {"error": f"{e.status_code}: {e.detail}"}
+    except Exception as e:  # never leak SQL + bound parameters to the caller
+        return {"error": f"500: queue write failed and was rolled back ({type(e).__name__}). Nothing was written; retry once, then report."}
 
 
 def _applied_index() -> list[dict]:
