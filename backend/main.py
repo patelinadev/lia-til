@@ -230,6 +230,8 @@ def applications_full():
                 "lastUpdate": r.last_update.isoformat() if r.last_update else None,
                 "status": r.status,
                 "notes": r.notes,
+                "companyId": r.company_id,
+                "applyUrl": r.apply_url,
             }
             for r in rows
         ]
@@ -769,19 +771,16 @@ def application_delete(app_num: int):
 
 
 @app.post("/api/applications/bulk", dependencies=[Depends(require_admin)])
-def application_bulk(entries: list[ApplicationFull]):
-    if SessionLocal is None:
-        raise HTTPException(status_code=503, detail="db unavailable")
-    with SessionLocal() as session:
-        for entry in entries:
-            row = session.get(Application, entry.app_num)
-            if row is None:
-                row = Application(app_num=entry.app_num)
-                session.add(row)
-            _apply_app(row, entry)
-            _shadow(session, "application", str(entry.app_num), "put", _serialize_app(row))
-        session.commit()
-        return {"upserted": len(entries)}
+def application_bulk():
+    """RETIRED 2026-09-20. This was the file→DB import: it overwrote every field of
+    every row from application_log.md, which is how a phone status update could be
+    silently reverted and how a caller could mint an App#. The database is the
+    source of truth now — create with POST /api/applications, change status with
+    PATCH /api/applications/{n}/status."""
+    raise HTTPException(
+        status_code=410,
+        detail="retired: the database is the source of truth. Use POST /api/applications and PATCH /api/applications/{n}/status.",
+    )
 
 
 # ===========================================================================
@@ -1170,76 +1169,6 @@ def to_apply_apply(row_id: int, body: Optional[ToApplyApplyIn] = None):
     return _create_application(
         ApplicationCreate(toApplyId=row_id, appliedDate=body.applied_date, source=body.source)
     )
-
-
-# ---------------------------------------------------------------------------
-# One-shot Phase 2 backfill (migration day). Idempotent — safe to re-run; a
-# dryRun reports what WOULD change and commits nothing. Remove after cutover.
-# ---------------------------------------------------------------------------
-class MigratePhase2In(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-    dry_run: bool = Field(default=True, alias="dryRun")
-    # legacy company string -> canonical company name (e.g. "Amazon (Annapurna Labs)" -> "Amazon")
-    company_aliases: dict[str, str] = Field(default_factory=dict, alias="companyAliases")
-    # app_num -> exact posting URL, only where it is known for certain
-    apply_urls: dict[int, str] = Field(default_factory=dict, alias="applyUrls")
-
-
-@app.post("/api/admin/migrate/phase2", dependencies=[Depends(require_admin)])
-def migrate_phase2(body: MigratePhase2In):
-    if SessionLocal is None:
-        raise HTTPException(status_code=503, detail="db unavailable")
-
-    def _noon(d):  # midday UTC so the calendar date survives any timezone
-        return datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc) if d else None
-
-    with SessionLocal() as session:
-        apps = session.execute(select(Application).order_by(Application.app_num)).scalars().all()
-        have_history = {
-            n for (n,) in session.execute(select(ApplicationStatusHistory.app_num).distinct()).all()
-        }
-        companies_before = session.execute(select(func.count()).select_from(Company)).scalar_one()
-        linked = urls = seeded_apps = history_rows = 0
-        for a in apps:
-            if a.company_id is None and (a.company or "").strip():
-                canonical = body.company_aliases.get(a.company, a.company)
-                c = _find_or_create_company(session, canonical, None)
-                a.company_id = c.id
-                linked += 1
-            url = (body.apply_urls.get(a.app_num) or "").strip()
-            if url and not a.apply_url:
-                a.apply_url = url
-                urls += 1
-            if a.app_num not in have_history:
-                session.add(ApplicationStatusHistory(
-                    app_num=a.app_num, old_status=None, new_status="Applied",
-                    changed_at=_noon(a.applied_date) or datetime.now(timezone.utc), source="migration"))
-                history_rows += 1
-                if (a.status or "Applied") != "Applied":
-                    session.add(ApplicationStatusHistory(
-                        app_num=a.app_num, old_status="Applied", new_status=a.status,
-                        changed_at=_noon(a.last_update or a.applied_date) or datetime.now(timezone.utc),
-                        source="migration"))
-                    history_rows += 1
-                seeded_apps += 1
-        session.flush()
-        companies_after = session.execute(select(func.count()).select_from(Company)).scalar_one()
-        result = {
-            "dryRun": body.dry_run,
-            "applications": len(apps),
-            "linkedToCompany": linked,
-            "companiesCreated": companies_after - companies_before,
-            "companiesTotal": companies_after,
-            "applyUrlsSet": urls,
-            "applicationsSeededWithHistory": seeded_apps,
-            "historyRowsInserted": history_rows,
-            "stillUnlinked": sum(1 for a in apps if a.company_id is None),
-        }
-        if body.dry_run:
-            session.rollback()
-        else:
-            session.commit()
-        return result
 
 
 # ===========================================================================
