@@ -1120,6 +1120,7 @@ def to_apply_put(body: ToApplyPut):
         deleted = 0
         for row in stale:
             if row.apply_url not in seen:
+                _shadow(session, "to_apply", str(row.id), "delete", _serialize_to_apply(row, None))
                 session.delete(row)
                 deleted += 1
         session.commit()
@@ -1169,6 +1170,36 @@ def to_apply_apply(row_id: int, body: Optional[ToApplyApplyIn] = None):
     return _create_application(
         ApplicationCreate(toApplyId=row_id, appliedDate=body.applied_date, source=body.source)
     )
+
+
+def _queue_put_from_tool(queue_date: str, rows: list) -> dict:
+    """Connector-side queue write. Same handler as PUT /api/to_apply, plus one guard:
+    an empty `rows` would delete every still-queued row of the day, which a sourcing
+    run never means — refuse it."""
+    if not rows:
+        return {"error": "422: rows is empty — refusing to clear the day's queue"}
+    try:
+        body = ToApplyPut(queueDate=queue_date, rows=[ToApplyRowIn(**r) for r in rows])
+    except Exception as e:  # pydantic validation — tell the model what to fix
+        return {"error": f"422: {e}"}
+    try:
+        return to_apply_put(body)
+    except HTTPException as e:
+        return {"error": f"{e.status_code}: {e.detail}"}
+
+
+def _applied_index() -> list[dict]:
+    """Compact dedup index of every application: enough to tell whether a posting
+    was already applied to (match on applyUrl first; company+role is only a hint)."""
+    if SessionLocal is None:
+        return []
+    with SessionLocal() as session:
+        rows = session.execute(select(Application).order_by(Application.app_num)).scalars().all()
+        return [
+            {"appNum": r.app_num, "company": r.company, "role": r.role, "status": r.status,
+             "appliedDate": r.applied_date.isoformat() if r.applied_date else None, "applyUrl": r.apply_url}
+            for r in rows
+        ]
 
 
 # ===========================================================================
@@ -1828,7 +1859,9 @@ if FastMCP is not None and MCP_TOKEN:
             "tools only READ the ledger and UPDATE an existing application's status "
             "(e.g. after a rejection email) — find the row with list_applications, "
             "then set_application_status(appNum, ...). They cannot create, delete, "
-            "or bulk-edit applications."
+            "or bulk-edit applications. For the daily sourcing run: list_applied_index "
+            "(dedup), get_to_apply_queue (today's On Deck queue), put_to_apply_queue "
+            "(write the whole day's queue; operator ticks are preserved)."
         ),
     )
 
@@ -2013,6 +2046,38 @@ if FastMCP is not None and MCP_TOKEN:
             return _set_status_core(app_num, status, "phone-mcp", notes, replace_notes=notes)
         except HTTPException as e:
             return _http_err(e)
+
+    @mcp.tool(annotations=_RO)
+    def get_to_apply_queue(date: Optional[str] = None) -> dict:
+        """Read the On Deck queue (the `to_apply` table): {queueDate, rows:[{id,
+        company, role, location, applyUrl, resume, note, reach, fresh, backup,
+        status}]}. `date` is 'YYYY-MM-DD'; omit it for the newest queue day. Rows with
+        status 'applied' / 'skipped' were already handled by the operator."""
+        try:
+            return to_apply_get(date)
+        except HTTPException as e:
+            return _http_err(e)
+
+    @mcp.tool(annotations=_WR)
+    def put_to_apply_queue(queue_date: str, rows: list[dict]) -> dict:
+        """Write the WHOLE On Deck queue for one day (the daily sourcing run). Each row:
+        {company, role, applyUrl, domain?, location?, resume?, note?, reach?, fresh?,
+        backup?}. `company` = the canonical employer name; `domain` = its website host
+        or ATS board slug when known (keeps one company one row). `backup: true` marks a
+        reserve row. Safe to call again the same day: rows are matched by applyUrl, rows
+        the operator already ticked KEEP their status, and still-queued rows missing
+        from `rows` are removed (the job closed). Always send the full day, never a
+        partial list. Empty `rows` is refused. Returns {queueDate, inserted, updated,
+        deleted}."""
+        return _queue_put_from_tool(queue_date, rows)
+
+    @mcp.tool(annotations=_RO)
+    def list_applied_index() -> list[dict]:
+        """Every application ever logged, compact, for DEDUP before queueing a job:
+        [{appNum, company, role, status, appliedDate, applyUrl}]. A posting is a
+        duplicate only when its URL / ATS job id matches; same company + title alone
+        is NOT proof — queue it and say so in the note."""
+        return _applied_index()
 
     # Stateless Streamable-HTTP app, mounted under the secret token prefix.
     # Final endpoint for the connector: https://<host>/mcp/<MCP_TOKEN>/
