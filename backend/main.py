@@ -7,7 +7,7 @@ Private full views come later behind auth (S2).
 
 import os
 import re
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import date as date_type, datetime, timedelta, timezone
 from typing import Optional
 
@@ -48,9 +48,17 @@ DAILYLOG_SECRET = os.environ.get("DAILYLOG_SECRET")
 # set it in Render's env, same as the other secrets. Upgrade path (Option 2): replace
 # this URL token with OAuth / a header check later, tools unchanged.
 MCP_TOKEN = os.environ.get("MCP_TOKEN")
-# Built at the bottom of the file (if fastmcp is installed AND MCP_TOKEN is set); the
-# lifespan below starts/stops its Streamable-HTTP session manager alongside the app.
+# URL token for the SUBMIT agent's own, narrower MCP server: /mcp/<SUBMIT_AGENT_SECRET>/.
+# That agent fills job-application forms, so it reads untrusted postings all day; its
+# server carries only the four job-pipeline tools it needs (read the queue, read the
+# applied index, list applications, set a status) — no daily-log tools, no queue write,
+# no delete. Separate from MCP_TOKEN so either can be rotated without the other.
+# Must be URL-safe ([A-Za-z0-9_-], 24+ chars); anything else leaves the server unmounted.
+SUBMIT_AGENT_SECRET = (os.environ.get("SUBMIT_AGENT_SECRET") or "").strip()
+# Built at the bottom of the file (if fastmcp is installed AND the token is set); the
+# lifespan below starts/stops their Streamable-HTTP session managers alongside the app.
 _MCP_APP = None
+_SUBMIT_MCP_APP = None
 
 
 def require_admin(x_admin_secret: Optional[str] = Header(default=None)) -> None:
@@ -156,13 +164,13 @@ async def lifespan(_app: FastAPI):
                 conn.execute(text("ALTER TABLE to_apply ADD COLUMN IF NOT EXISTS backup BOOLEAN NOT NULL DEFAULT false"))
         except Exception:
             pass
-    # Starlette does NOT auto-run a mounted sub-app's lifespan, so when the MCP
+    # Starlette does NOT auto-run a mounted sub-app's lifespan, so when an MCP
     # server is mounted (bottom of file), nest its lifespan inside ours to start
     # and stop its Streamable-HTTP session manager with the app.
-    if _MCP_APP is not None:
-        async with _MCP_APP.lifespan(_app):
-            yield
-    else:
+    async with AsyncExitStack() as stack:
+        for mcp_app in (_MCP_APP, _SUBMIT_MCP_APP):
+            if mcp_app is not None:
+                await stack.enter_async_context(mcp_app.lifespan(_app))
         yield
 
 
@@ -2111,3 +2119,49 @@ if FastMCP is not None and MCP_TOKEN:
         host_origin_protection=False,
     )
     app.mount(f"/mcp/{MCP_TOKEN}", _MCP_APP)
+
+    # ---- Submit agent's server: the same handlers, four tools only. ----
+    # A bad or duplicate token must never take the deploy down, so it is skipped
+    # (server not mounted) instead of raising.
+    if (
+        re.fullmatch(r"[A-Za-z0-9_-]{24,}", SUBMIT_AGENT_SECRET)
+        and SUBMIT_AGENT_SECRET != MCP_TOKEN
+    ):
+        submit_mcp = FastMCP(
+            name="lia-til-submit",
+            instructions=(
+                "Job-application pipeline for Lia's submit agent. get_to_apply_queue "
+                "reads today's On Deck queue; list_applied_index is the dedup list (a "
+                "posting is a duplicate only when its URL / ATS job id matches); "
+                "list_applications finds an existing application; set_application_status "
+                "updates its status. These tools cannot create an application, mint an "
+                "App#, or change the queue — the operator does that in the Bridge app."
+            ),
+        )
+        for _tool in (get_to_apply_queue, list_applied_index, list_applications):
+            submit_mcp.tool(annotations=_RO)(_tool)
+
+        @submit_mcp.tool(name="set_application_status", annotations=_WR)
+        def submit_set_application_status(
+            app_num: int,
+            status: str,
+            notes: Optional[str] = None,
+        ) -> dict:
+            """Update ONE existing application's status (Rejected / OA / Phone /
+            Onsite / Offer / Ghosted ...), found via list_applications. Appends one
+            row to the status history with source="submit-agent". `notes`, IF you
+            pass it, REPLACES the existing notes wholesale (omit it to keep them).
+            Returns the updated row, or {"error": "404: not found"} if that app_num
+            doesn't exist."""
+            try:
+                return _set_status_core(app_num, status, "submit-agent", notes, replace_notes=notes)
+            except HTTPException as e:
+                return _http_err(e)
+
+        # Final endpoint for the agent: https://<host>/mcp/<SUBMIT_AGENT_SECRET>/
+        _SUBMIT_MCP_APP = submit_mcp.http_app(
+            path="/",
+            stateless_http=True,
+            host_origin_protection=False,
+        )
+        app.mount(f"/mcp/{SUBMIT_AGENT_SECRET}", _SUBMIT_MCP_APP)
