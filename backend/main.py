@@ -48,12 +48,15 @@ DAILYLOG_SECRET = os.environ.get("DAILYLOG_SECRET")
 # set it in Render's env, same as the other secrets. Upgrade path (Option 2): replace
 # this URL token with OAuth / a header check later, tools unchanged.
 MCP_TOKEN = os.environ.get("MCP_TOKEN")
-# URL token for the SUBMIT agent's own, narrower MCP server: /mcp/<SUBMIT_AGENT_SECRET>/.
-# That agent fills job-application forms, so it reads untrusted postings all day; its
-# server carries only the four job-pipeline tools it needs (read the queue, read the
-# applied index, list applications, set a status) — no daily-log tools, no queue write,
-# no delete. Separate from MCP_TOKEN so either can be rotated without the other.
-# Must be URL-safe ([A-Za-z0-9_-], 24+ chars); anything else leaves the server unmounted.
+# The SUBMIT agent's key. That agent fills job-application forms, so it reads untrusted
+# postings all day; the key opens only what the operator has granted it so far:
+#   - header x-admin-secret on GET /api/to_apply (read the queue) and on
+#     PATCH /api/to_apply/{id} — where it may ONLY mark a still-queued row "skipped";
+#   - URL token of its own read-only MCP server, /mcp/<SUBMIT_AGENT_SECRET>/ (read the
+#     queue, read the applied index, list applications).
+# It can NOT apply a row / mint an App#, change an application's status, write the queue,
+# or reach the daily log. Separate from MCP_TOKEN so either rotates without the other.
+# The MCP server needs it URL-safe ([A-Za-z0-9_-], 24+ chars), else it stays unmounted.
 SUBMIT_AGENT_SECRET = (os.environ.get("SUBMIT_AGENT_SECRET") or "").strip()
 # Built at the bottom of the file (if fastmcp is installed AND the token is set); the
 # lifespan below starts/stops their Streamable-HTTP session managers alongside the app.
@@ -78,6 +81,16 @@ def require_daily_writer(x_admin_secret: Optional[str] = Header(default=None)) -
     ok_scoped = bool(DAILYLOG_SECRET) and x_admin_secret == DAILYLOG_SECRET
     if not (ok_master or ok_scoped):
         raise HTTPException(status_code=401, detail="unauthorized")
+
+
+def require_queue_reader(x_admin_secret: Optional[str] = Header(default=None)) -> bool:
+    """Gate for reading the On Deck queue and ticking a row: the master secret,
+    DAILYLOG_SECRET (Bridge), or SUBMIT_AGENT_SECRET. Returns True when the caller is
+    the submit agent, so the handler can hold it to its narrower rights."""
+    if SUBMIT_AGENT_SECRET and x_admin_secret == SUBMIT_AGENT_SECRET:
+        return True
+    require_daily_writer(x_admin_secret)
+    return False
 
 
 # ---- Write schemas (P2·S4 CRUD). Pydantic validates the body → 422 on bad shape.
@@ -1090,7 +1103,7 @@ def _serialize_to_apply(r: ToApply, company_name: Optional[str]) -> dict:
     }
 
 
-@app.get("/api/to_apply", dependencies=[Depends(require_daily_writer)])
+@app.get("/api/to_apply", dependencies=[Depends(require_queue_reader)])
 def to_apply_get(date: Optional[str] = None):
     """Today's queue (or the newest queue day when `date` is omitted — if the
     sourcing run hasn't happened yet you get yesterday's, labelled by queueDate).
@@ -1157,17 +1170,32 @@ def to_apply_put(body: ToApplyPut):
         return {"queueDate": body.queue_date.isoformat(), "inserted": inserted, "updated": updated, "deleted": deleted}
 
 
-@app.patch("/api/to_apply/{row_id}", dependencies=[Depends(require_daily_writer)])
-def to_apply_patch(row_id: int, body: ToApplyPatch):
+@app.patch("/api/to_apply/{row_id}")
+def to_apply_patch(
+    row_id: int,
+    body: ToApplyPatch,
+    from_submit_agent: bool = Depends(require_queue_reader),
+):
     """Bridge tick: queued → applied / skipped (or back). Does NOT mint an App# —
     only POST /api/applications does (single-writer rule); pass toApplyId there to
-    promote the row. Scoped write → shadowed like every other scoped write."""
+    promote the row. Scoped write → shadowed like every other scoped write.
+
+    The submit agent's key may do one thing here: mark a still-queued row "skipped"
+    (the req closed, or it fails a gate). Its `note` is appended to the row's note
+    with a "submit-agent:" prefix, so the sourcing note is never overwritten."""
+    if from_submit_agent and body.status != "skipped":
+        raise HTTPException(status_code=403, detail="submit agent may only set status 'skipped'")
     if SessionLocal is None:
         raise HTTPException(status_code=503, detail="db unavailable")
     with SessionLocal() as session:
         row = session.get(ToApply, row_id)
         if row is None:
             raise HTTPException(status_code=404, detail="not found")
+        if from_submit_agent:
+            if row.status not in ("queued", "skipped"):
+                raise HTTPException(status_code=409, detail=f"row is already '{row.status}'")
+            if body.note:
+                body.note = " | ".join(x for x in (row.note, f"submit-agent: {body.note}") if x)
         if body.status is not None:
             if body.status not in VALID_TO_APPLY_STATUS:
                 raise HTTPException(status_code=422, detail=f"status must be one of {sorted(VALID_TO_APPLY_STATUS)}")
@@ -2120,7 +2148,7 @@ if FastMCP is not None and MCP_TOKEN:
     )
     app.mount(f"/mcp/{MCP_TOKEN}", _MCP_APP)
 
-    # ---- Submit agent's server: the same handlers, four tools only. ----
+    # ---- Submit agent's server: the same handlers, three READ tools only. ----
     # A bad or duplicate token must never take the deploy down, so it is skipped
     # (server not mounted) instead of raising.
     if (
@@ -2133,30 +2161,13 @@ if FastMCP is not None and MCP_TOKEN:
                 "Job-application pipeline for Lia's submit agent. get_to_apply_queue "
                 "reads today's On Deck queue; list_applied_index is the dedup list (a "
                 "posting is a duplicate only when its URL / ATS job id matches); "
-                "list_applications finds an existing application; set_application_status "
-                "updates its status. These tools cannot create an application, mint an "
-                "App#, or change the queue — the operator does that in the Bridge app."
+                "list_applications finds an existing application. Read-only: these tools "
+                "cannot create an application, mint an App#, change a status, or change "
+                "the queue — the operator does that in the Bridge app."
             ),
         )
         for _tool in (get_to_apply_queue, list_applied_index, list_applications):
             submit_mcp.tool(annotations=_RO)(_tool)
-
-        @submit_mcp.tool(name="set_application_status", annotations=_WR)
-        def submit_set_application_status(
-            app_num: int,
-            status: str,
-            notes: Optional[str] = None,
-        ) -> dict:
-            """Update ONE existing application's status (Rejected / OA / Phone /
-            Onsite / Offer / Ghosted ...), found via list_applications. Appends one
-            row to the status history with source="submit-agent". `notes`, IF you
-            pass it, REPLACES the existing notes wholesale (omit it to keep them).
-            Returns the updated row, or {"error": "404: not found"} if that app_num
-            doesn't exist."""
-            try:
-                return _set_status_core(app_num, status, "submit-agent", notes, replace_notes=notes)
-            except HTTPException as e:
-                return _http_err(e)
 
         # Final endpoint for the agent: https://<host>/mcp/<SUBMIT_AGENT_SECRET>/
         _SUBMIT_MCP_APP = submit_mcp.http_app(
