@@ -68,6 +68,11 @@ from the browser (private area), and **from a phone** via a custom MCP connector
 - **Two-tier secrets:** a master `BACKEND_SECRET` for full CRUD, plus a **scoped**
   `DAILYLOG_SECRET` that unlocks *only* the daily-log + index routes — the token a phone/cloud
   session carries has a blast radius of just the daily log.
+- **One key per client:** the connector (`/mcp/<MCP_TOKEN>/`) carries the daily-log tools plus
+  the job-pipeline ones. The job-submit agent, which reads untrusted postings all day, has its
+  own `SUBMIT_AGENT_SECRET`: as a header it can read the On Deck queue and mark a still-queued
+  row `skipped`; as a URL token it opens a read-only MCP server (queue, applied index, list
+  applications). It cannot mint an App#, change a status, or write the queue.
 - **Append-only shadow backup:** every scoped-key write is snapshotted to a `shadow_history`
   table the scoped key can't read or alter; a master-only `/restore` recovers from any bad
   write or delete.
