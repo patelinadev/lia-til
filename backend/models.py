@@ -83,7 +83,7 @@ class ApplicationStatusHistory(Base):
     old_status = Column(String(50))  # NULL on the initial / seeded row
     new_status = Column(String(50), nullable=False)
     changed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    source = Column(String(40))  # desktop-claude | phone-mcp | website-admin | migration
+    source = Column(String(40))  # desktop-claude | phone-mcp | submit-agent | website-admin | migration
     note = Column(Text)  # rejection text, OA link, ...
 
 
