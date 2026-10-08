@@ -68,6 +68,10 @@ from the browser (private area), and **from a phone** via a custom MCP connector
 - **Two-tier secrets:** a master `BACKEND_SECRET` for full CRUD, plus a **scoped**
   `DAILYLOG_SECRET` that unlocks *only* the daily-log + index routes — the token a phone/cloud
   session carries has a blast radius of just the daily log.
+- **One MCP server per client:** the connector (`/mcp/<MCP_TOKEN>/`) carries the daily-log tools
+  plus the job-pipeline ones; the job-submit agent, which reads untrusted postings all day, gets
+  its own server (`/mcp/<SUBMIT_AGENT_SECRET>/`) with four tools only — read the queue, read the
+  applied index, list applications, set a status. Each URL token rotates on its own.
 - **Append-only shadow backup:** every scoped-key write is snapshotted to a `shadow_history`
   table the scoped key can't read or alter; a master-only `/restore` recovers from any bad
   write or delete.
