@@ -50,9 +50,10 @@ DAILYLOG_SECRET = os.environ.get("DAILYLOG_SECRET")
 MCP_TOKEN = os.environ.get("MCP_TOKEN")
 # URL token for the SUBMIT agent's own, narrower MCP server: /mcp/<SUBMIT_AGENT_SECRET>/.
 # That agent fills job-application forms, so it reads untrusted postings all day; its
-# server carries only the four job-pipeline tools it needs (read the queue, read the
-# applied index, list applications, set a status) — no daily-log tools, no queue write,
-# no delete. Separate from MCP_TOKEN so either can be rotated without the other.
+# server carries only the five job-pipeline tools it needs (read the queue, read the
+# applied index, list applications, set a status, record a queue row it just submitted
+# as applied) — no daily-log tools, no queue write, no arbitrary application create, no
+# delete. Separate from MCP_TOKEN so either can be rotated without the other.
 # Must be URL-safe ([A-Za-z0-9_-], 24+ chars); anything else leaves the server unmounted.
 SUBMIT_AGENT_SECRET = (os.environ.get("SUBMIT_AGENT_SECRET") or "").strip()
 # Built at the bottom of the file (if fastmcp is installed AND the token is set); the
@@ -2120,7 +2121,7 @@ if FastMCP is not None and MCP_TOKEN:
     )
     app.mount(f"/mcp/{MCP_TOKEN}", _MCP_APP)
 
-    # ---- Submit agent's server: the same handlers, four tools only. ----
+    # ---- Submit agent's server: the same handlers, five tools only. ----
     # A bad or duplicate token must never take the deploy down, so it is skipped
     # (server not mounted) instead of raising.
     if (
@@ -2134,8 +2135,10 @@ if FastMCP is not None and MCP_TOKEN:
                 "reads today's On Deck queue; list_applied_index is the dedup list (a "
                 "posting is a duplicate only when its URL / ATS job id matches); "
                 "list_applications finds an existing application; set_application_status "
-                "updates its status. These tools cannot create an application, mint an "
-                "App#, or change the queue — the operator does that in the Bridge app."
+                "updates its status; apply_queue_row records a queue row you have "
+                "actually submitted as applied (the API mints the App#). These tools "
+                "cannot create an application that is not on the queue, choose an App#, "
+                "or rewrite the queue."
             ),
         )
         for _tool in (get_to_apply_queue, list_applied_index, list_applications):
@@ -2155,6 +2158,29 @@ if FastMCP is not None and MCP_TOKEN:
             doesn't exist."""
             try:
                 return _set_status_core(app_num, status, "submit-agent", notes, replace_notes=notes)
+            except HTTPException as e:
+                return _http_err(e)
+
+        @submit_mcp.tool(name="apply_queue_row", annotations={**_WR, "idempotentHint": False})
+        def submit_apply_queue_row(to_apply_id: int, applied_date: Optional[str] = None) -> dict:
+            """Record ONE On Deck queue row as applied, AFTER its application form was
+            really submitted. `to_apply_id` is the row's `id` from get_to_apply_queue.
+            The API mints the App#, copies company / role / applyUrl / resume from the
+            row, writes the first history row with source="submit-agent" and marks the
+            row applied — one transaction. `applied_date` is 'YYYY-MM-DD' (omit for
+            today). It can only promote an existing queue row, never create an
+            arbitrary application. Calling it again for the same posting returns
+            {"error": "409: ..."} carrying existingAppNum (nothing new is minted);
+            {"error": "404: ..."} if the row doesn't exist. Returns the new
+            application row, including its appNum."""
+            try:
+                body = ApplicationCreate(
+                    toApplyId=to_apply_id, appliedDate=applied_date, source="submit-agent"
+                )
+            except ValueError:
+                return {"error": "422: applied_date must be 'YYYY-MM-DD'"}
+            try:
+                return _create_application(body)
             except HTTPException as e:
                 return _http_err(e)
 
