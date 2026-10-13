@@ -50,10 +50,10 @@ DAILYLOG_SECRET = os.environ.get("DAILYLOG_SECRET")
 MCP_TOKEN = os.environ.get("MCP_TOKEN")
 # URL token for the SUBMIT agent's own, narrower MCP server: /mcp/<SUBMIT_AGENT_SECRET>/.
 # That agent fills job-application forms, so it reads untrusted postings all day; its
-# server carries only the five job-pipeline tools it needs (read the queue, read the
+# server carries only the six job-pipeline tools it needs (read the queue, read the
 # applied index, list applications, set a status, record a queue row it just submitted
-# as applied) — no daily-log tools, no queue write, no arbitrary application create, no
-# delete. Separate from MCP_TOKEN so either can be rotated without the other.
+# as applied, log a fill note on / skip a row it did not submit) — no daily-log tools,
+# no whole-queue write, no arbitrary application create, no delete. Separate from MCP_TOKEN so either can be rotated without the other.
 # Must be URL-safe ([A-Za-z0-9_-], 24+ chars); anything else leaves the server unmounted.
 SUBMIT_AGENT_SECRET = (os.environ.get("SUBMIT_AGENT_SECRET") or "").strip()
 # Built at the bottom of the file (if fastmcp is installed AND the token is set); the
@@ -1144,7 +1144,9 @@ def to_apply_put(body: ToApplyPut):
                 updated += 1
             row.company_id = company.id if company else None
             row.role, row.location, row.resume = r.role, r.location, r.resume
-            row.note, row.reach, row.fresh, row.backup = r.note, r.reach, r.fresh, r.backup
+            # r.note is the sourcing note; keep what the submit agent logged on the row.
+            row.note = _join_note(r.note, *_agent_notes(row.note))
+            row.reach, row.fresh, row.backup = r.reach, r.fresh, r.backup
         stale = session.execute(
             select(ToApply).where(ToApply.queue_date == body.queue_date, ToApply.status == "queued")
         ).scalars().all()
@@ -1156,6 +1158,49 @@ def to_apply_put(body: ToApplyPut):
                 deleted += 1
         session.commit()
         return {"queueDate": body.queue_date.isoformat(), "inserted": inserted, "updated": updated, "deleted": deleted}
+
+
+AGENT_NOTE_PREFIX = "submit-agent: "
+AGENT_NOTE_MAX = 500
+
+
+def _agent_notes(note: Optional[str]) -> list[str]:
+    """The " | "-separated parts of a queue row's note that the submit agent wrote."""
+    return [p for p in (note or "").split(" | ") if p.startswith(AGENT_NOTE_PREFIX)]
+
+
+def _join_note(*parts: Optional[str]) -> Optional[str]:
+    return " | ".join(p for p in parts if p) or None
+
+
+def _submit_agent_update_row(row_id: int, fill_note: Optional[str], skip: bool) -> dict:
+    """The submit agent's one write on a queue row it has NOT submitted: log how the
+    form filling went, and/or mark the row skipped. The note is appended (prefixed
+    "submit-agent: "), never replacing the sourcing note. It cannot set "applied"
+    (that is apply_queue_row, which mints the App#) and cannot touch an applied row's
+    status. Shadowed like every other scoped write."""
+    fill_note = " ".join((fill_note or "").split())  # one line; " | " stays a separator
+    if not fill_note and not skip:
+        raise HTTPException(status_code=422, detail="pass fill_note, skip=true, or both")
+    if len(fill_note) > AGENT_NOTE_MAX:
+        raise HTTPException(status_code=422, detail=f"fill_note is over {AGENT_NOTE_MAX} characters")
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        row = session.get(ToApply, row_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="not found")
+        if skip:
+            if row.status == "applied":
+                raise HTTPException(status_code=409, detail="row is already 'applied'")
+            row.status = "skipped"
+        if fill_note:
+            row.note = _join_note(row.note, AGENT_NOTE_PREFIX + fill_note.replace(" | ", " / "))
+        name = session.get(Company, row.company_id).name if row.company_id else None
+        _shadow(session, "to_apply", str(row_id), "patch", _serialize_to_apply(row, name))
+        session.commit()
+        session.refresh(row)
+        return _serialize_to_apply(row, name)
 
 
 @app.patch("/api/to_apply/{row_id}", dependencies=[Depends(require_daily_writer)])
@@ -2121,7 +2166,7 @@ if FastMCP is not None and MCP_TOKEN:
     )
     app.mount(f"/mcp/{MCP_TOKEN}", _MCP_APP)
 
-    # ---- Submit agent's server: the same handlers, five tools only. ----
+    # ---- Submit agent's server: the same handlers, six tools only. ----
     # A bad or duplicate token must never take the deploy down, so it is skipped
     # (server not mounted) instead of raising.
     if (
@@ -2136,7 +2181,8 @@ if FastMCP is not None and MCP_TOKEN:
                 "posting is a duplicate only when its URL / ATS job id matches); "
                 "list_applications finds an existing application; set_application_status "
                 "updates its status; apply_queue_row records a queue row you have "
-                "actually submitted as applied (the API mints the App#). These tools "
+                "actually submitted as applied (the API mints the App#); update_queue_row "
+                "logs how filling a row went, or skips it, when you did not submit. These tools "
                 "cannot create an application that is not on the queue, choose an App#, "
                 "or rewrite the queue."
             ),
@@ -2181,6 +2227,29 @@ if FastMCP is not None and MCP_TOKEN:
                 return {"error": "422: applied_date must be 'YYYY-MM-DD'"}
             try:
                 return _create_application(body)
+            except HTTPException as e:
+                return _http_err(e)
+
+        @submit_mcp.tool(name="update_queue_row", annotations={**_WR, "idempotentHint": False})
+        def submit_update_queue_row(
+            to_apply_id: int,
+            fill_note: Optional[str] = None,
+            skip: bool = False,
+        ) -> dict:
+            """Log how filling ONE On Deck queue row's application form went, for a row
+            you have NOT submitted. `to_apply_id` is the row's `id` from
+            get_to_apply_queue. `fill_note` is one short line (max 500 chars) such as
+            "filled, waiting for Lia to submit", "blocked: login required" or
+            "posting closed"; it is APPENDED to the row's note as "submit-agent: ...",
+            so the sourcing note and your earlier notes are kept. `skip=true` also
+            marks the row skipped — use it only when the req is closed or fails a
+            gate (e.g. no sponsorship), and say why in `fill_note`. Pass at least one
+            of the two. This never marks a row applied and never mints an App#: after
+            a real submission call apply_queue_row instead. Returns the updated row;
+            {"error": "409: ..."} when asked to skip an already-applied row,
+            {"error": "404: ..."} if the row doesn't exist."""
+            try:
+                return _submit_agent_update_row(to_apply_id, fill_note, skip)
             except HTTPException as e:
                 return _http_err(e)
 
