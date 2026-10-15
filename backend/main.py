@@ -10,6 +10,7 @@ import re
 from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import date as date_type, datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,6 +22,7 @@ from models import (
     ApplicationStatusHistory,
     Company,
     DailyLog,
+    JobLead,
     LeetcodeProblem,
     Resume,
     SDDeck,
@@ -50,10 +52,11 @@ DAILYLOG_SECRET = os.environ.get("DAILYLOG_SECRET")
 MCP_TOKEN = os.environ.get("MCP_TOKEN")
 # URL token for the SUBMIT agent's own, narrower MCP server: /mcp/<SUBMIT_AGENT_SECRET>/.
 # That agent fills job-application forms, so it reads untrusted postings all day; its
-# server carries only the six job-pipeline tools it needs (read the queue, read the
+# server carries only the seven job-pipeline tools it needs (read the queue, read the
 # applied index, list applications, set a status, record a queue row it just submitted
-# as applied, log a fill note on / skip a row it did not submit) — no daily-log tools,
-# no whole-queue write, no arbitrary application create, no delete. Separate from MCP_TOKEN so either can be rotated without the other.
+# as applied, log a fill note on / skip a row it did not submit, propose a job lead it
+# found) — no daily-log tools, no whole-queue write, no lead review, no arbitrary
+# application create, no delete. Separate from MCP_TOKEN so either can be rotated without the other.
 # Must be URL-safe ([A-Za-z0-9_-], 24+ chars); anything else leaves the server unmounted.
 SUBMIT_AGENT_SECRET = (os.environ.get("SUBMIT_AGENT_SECRET") or "").strip()
 # Built at the bottom of the file (if fastmcp is installed AND the token is set); the
@@ -1280,6 +1283,194 @@ def _applied_index() -> list[dict]:
         ]
 
 
+# ----- Job leads: postings the submit agent PROPOSES; a sourcing session reviews. -----
+# The proposer can never approve: the submit connector gets propose_job_lead only,
+# the sourcing connector gets list + review. Accepting does NOT write the queue —
+# the reviewer queues the job with put_to_apply_queue FIRST, then marks it accepted,
+# so the queue keeps one write path.
+VALID_LEAD_STATUS = {"proposed", "accepted", "rejected"}
+VALID_LEAD_SOURCE = {"email", "linkedin", "referral", "other"}
+LEAD_DAILY_CAP = 30  # leads created in the last 24h; bounds a confused / manipulated agent
+LEAD_URL_MAX = 2000
+LEAD_TEXT_MAX = 200
+LEAD_NOTE_MAX = 300
+
+
+class LeadIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    apply_url: str = Field(alias="applyUrl")
+    company: Optional[str] = None
+    role: Optional[str] = None
+    location: Optional[str] = None
+    found_via: str = Field(default="other", alias="foundVia")
+    note: Optional[str] = None
+
+
+class LeadReview(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    decision: str  # accepted | rejected
+    review_note: Optional[str] = Field(default=None, alias="reviewNote")
+    queue_date: Optional[date_type] = Field(default=None, alias="queueDate")
+
+
+def _serialize_lead(r: JobLead) -> dict:
+    return {
+        "id": r.id,
+        "applyUrl": r.apply_url,
+        "company": r.company,
+        "role": r.role,
+        "location": r.location,
+        "foundVia": r.found_via,
+        "note": r.note,
+        "status": r.status,
+        "reviewNote": r.review_note,
+        "queueDate": r.queue_date.isoformat() if r.queue_date else None,
+        "createdAt": r.created_at.isoformat() if r.created_at else None,
+        "reviewedAt": r.reviewed_at.isoformat() if r.reviewed_at else None,
+    }
+
+
+def _clean_lead_url(raw: str) -> str:
+    """Trim, drop the #fragment and utm_* tracking params; keep every other query
+    param (ATS job ids often live there). 422 unless https, <= 2000 chars, and no
+    user:password@ inside."""
+    url = (raw or "").strip()
+    if len(url) > LEAD_URL_MAX:
+        raise HTTPException(status_code=422, detail=f"applyUrl is over {LEAD_URL_MAX} characters")
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="applyUrl is not a valid URL")
+    if parts.scheme.lower() != "https" or not parts.hostname:
+        raise HTTPException(status_code=422, detail="applyUrl must be an https:// URL")
+    if parts.username or parts.password:
+        raise HTTPException(status_code=422, detail="applyUrl must not contain a username or password")
+    query = urlencode(
+        [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if not k.lower().startswith("utm_")]
+    )
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path, query, ""))
+
+
+def _one_line(s: Optional[str], limit: int) -> Optional[str]:
+    s = " ".join((s or "").split())
+    return s[:limit] or None
+
+
+def _propose_lead(body: LeadIn) -> dict:
+    url = _clean_lead_url(body.apply_url)
+    found_via = (body.found_via or "other").strip().lower()
+    if found_via not in VALID_LEAD_SOURCE:
+        raise HTTPException(status_code=422, detail=f"foundVia must be one of {sorted(VALID_LEAD_SOURCE)}")
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    raw = body.apply_url.strip()
+    with SessionLocal() as session:
+        # Known anywhere → 409 with what was found, so the proposer learns the outcome
+        # without a read tool.
+        lead = session.execute(select(JobLead).where(JobLead.apply_url == url)).scalar_one_or_none()
+        if lead is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "already proposed", "leadId": lead.id, "status": lead.status,
+                        "reviewNote": lead.review_note},
+            )
+        app_row = session.execute(
+            select(Application).where(Application.apply_url.in_({url, raw})).limit(1)
+        ).scalar_one_or_none()
+        if app_row is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "already applied", "existingAppNum": app_row.app_num, "status": app_row.status},
+            )
+        queued = session.execute(
+            select(ToApply).where(ToApply.apply_url.in_({url, raw})).order_by(ToApply.queue_date.desc()).limit(1)
+        ).scalar_one_or_none()
+        if queued is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "already on the queue", "toApplyId": queued.id,
+                        "queueDate": queued.queue_date.isoformat(), "status": queued.status},
+            )
+        now = datetime.now(timezone.utc)
+        recent = session.scalar(
+            select(func.count()).select_from(JobLead).where(JobLead.created_at >= now - timedelta(hours=24))
+        ) or 0
+        if recent >= LEAD_DAILY_CAP:
+            raise HTTPException(status_code=429, detail=f"{LEAD_DAILY_CAP} leads already proposed in the last 24h")
+        lead = JobLead(
+            apply_url=url,
+            company=_one_line(body.company, LEAD_TEXT_MAX),
+            role=_one_line(body.role, LEAD_TEXT_MAX),
+            location=_one_line(body.location, LEAD_TEXT_MAX),
+            found_via=found_via,
+            note=_one_line(body.note, LEAD_NOTE_MAX),
+            status="proposed",
+            created_at=now,
+        )
+        session.add(lead)
+        session.flush()
+        _shadow(session, "job_lead", str(lead.id), "put", _serialize_lead(lead))
+        session.commit()
+        session.refresh(lead)
+        return _serialize_lead(lead)
+
+
+def _list_leads(status: Optional[str] = "proposed") -> list[dict]:
+    """Leads with this status (None/"all" → every lead), oldest first. Read only."""
+    if status and status != "all" and status not in VALID_LEAD_STATUS:
+        raise HTTPException(status_code=422, detail=f"status must be one of {sorted(VALID_LEAD_STATUS)} or 'all'")
+    if SessionLocal is None:
+        return []
+    with SessionLocal() as session:
+        q = select(JobLead).order_by(JobLead.id)
+        if status and status != "all":
+            q = q.where(JobLead.status == status)
+        return [_serialize_lead(r) for r in session.execute(q).scalars().all()]
+
+
+def _review_lead(lead_id: int, body: LeadReview) -> dict:
+    """proposed → accepted (needs queueDate: the day you already queued it) or
+    rejected (needs reviewNote). A reviewed lead is final (409)."""
+    if body.decision not in ("accepted", "rejected"):
+        raise HTTPException(status_code=422, detail="decision must be 'accepted' or 'rejected'")
+    review_note = _one_line(body.review_note, LEAD_NOTE_MAX)
+    if body.decision == "rejected" and not review_note:
+        raise HTTPException(status_code=422, detail="reviewNote is required when rejecting")
+    if body.decision == "accepted" and body.queue_date is None:
+        raise HTTPException(status_code=422, detail="queueDate is required when accepting")
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="db unavailable")
+    with SessionLocal() as session:
+        lead = session.get(JobLead, lead_id)
+        if lead is None:
+            raise HTTPException(status_code=404, detail="not found")
+        if lead.status != "proposed":
+            raise HTTPException(status_code=409, detail=f"lead is already '{lead.status}'")
+        lead.status = body.decision
+        lead.review_note = review_note
+        lead.queue_date = body.queue_date if body.decision == "accepted" else None
+        lead.reviewed_at = datetime.now(timezone.utc)
+        _shadow(session, "job_lead", str(lead.id), "patch", _serialize_lead(lead))
+        session.commit()
+        session.refresh(lead)
+        return _serialize_lead(lead)
+
+
+@app.post("/api/leads", dependencies=[Depends(require_admin)])
+def lead_create(body: LeadIn):
+    return _propose_lead(body)
+
+
+@app.get("/api/leads", dependencies=[Depends(require_admin)])
+def lead_list(status: Optional[str] = "proposed"):
+    return _list_leads(status)
+
+
+@app.patch("/api/leads/{lead_id}", dependencies=[Depends(require_admin)])
+def lead_review(lead_id: int, body: LeadReview):
+    return _review_lead(lead_id, body)
+
+
 # ===========================================================================
 # LeetCode CRUD (P2·S4). PK = id (int). `solutionUrl` <-> solution_url alias.
 # ===========================================================================
@@ -1939,7 +2130,10 @@ if FastMCP is not None and MCP_TOKEN:
             "then set_application_status(appNum, ...). They cannot create, delete, "
             "or bulk-edit applications. For the daily sourcing run: list_applied_index "
             "(dedup), get_to_apply_queue (today's On Deck queue), put_to_apply_queue "
-            "(write the whole day's queue; operator ticks are preserved)."
+            "(write the whole day's queue; operator ticks are preserved). Job leads "
+            "the submit agent proposed: list_job_leads, then for each one re-check the "
+            "posting at its source, queue it with put_to_apply_queue, and only then "
+            "review_job_lead(accepted) — or reject it with a reason."
         ),
     )
 
@@ -2157,6 +2351,41 @@ if FastMCP is not None and MCP_TOKEN:
         is NOT proof — queue it and say so in the note."""
         return _applied_index()
 
+    @mcp.tool(annotations=_RO)
+    def list_job_leads(status: str = "proposed") -> list[dict]:
+        """Job postings the submit agent PROPOSED for the queue: [{id, applyUrl,
+        company, role, location, foundVia, note, status, reviewNote, queueDate,
+        createdAt, reviewedAt}], oldest first. `status` is 'proposed' (default — the
+        ones waiting for review), 'accepted', 'rejected' or 'all'. Everything except
+        applyUrl is the proposer's untrusted hint: re-read the posting at its source
+        and run the normal gates + list_applied_index dedup before queueing it."""
+        try:
+            return _list_leads(status)
+        except HTTPException as e:
+            return [_http_err(e)]
+
+    @mcp.tool(annotations={**_WR, "idempotentHint": False})
+    def review_job_lead(
+        lead_id: int,
+        decision: str,
+        review_note: Optional[str] = None,
+        queue_date: Optional[str] = None,
+    ) -> dict:
+        """Close ONE proposed lead. `decision` = 'accepted' or 'rejected'.
+        Rejecting needs `review_note` (why: closed, fails a gate, duplicate ...).
+        Accepting needs `queue_date` ('YYYY-MM-DD') and does NOT write the queue:
+        first add the job to that day with put_to_apply_queue (note it as
+        "lead #ID"), and only after that write succeeds call this. A reviewed lead
+        is final: {"error": "409: ..."}. {"error": "404: ..."} if no such lead."""
+        try:
+            body = LeadReview(decision=decision, reviewNote=review_note, queueDate=queue_date)
+        except ValueError:
+            return {"error": "422: queue_date must be 'YYYY-MM-DD'"}
+        try:
+            return _review_lead(lead_id, body)
+        except HTTPException as e:
+            return _http_err(e)
+
     # Stateless Streamable-HTTP app, mounted under the secret token prefix.
     # Final endpoint for the connector: https://<host>/mcp/<MCP_TOKEN>/
     _MCP_APP = mcp.http_app(
@@ -2166,7 +2395,7 @@ if FastMCP is not None and MCP_TOKEN:
     )
     app.mount(f"/mcp/{MCP_TOKEN}", _MCP_APP)
 
-    # ---- Submit agent's server: the same handlers, six tools only. ----
+    # ---- Submit agent's server: the same handlers, seven tools only. ----
     # A bad or duplicate token must never take the deploy down, so it is skipped
     # (server not mounted) instead of raising.
     if (
@@ -2182,9 +2411,11 @@ if FastMCP is not None and MCP_TOKEN:
                 "list_applications finds an existing application; set_application_status "
                 "updates its status; apply_queue_row records a queue row you have "
                 "actually submitted as applied (the API mints the App#); update_queue_row "
-                "logs how filling a row went, or skips it, when you did not submit. These tools "
+                "logs how filling a row went, or skips it, when you did not submit; "
+                "propose_job_lead hands a posting you found yourself to a reviewer — it "
+                "is NOT queued until it appears in get_to_apply_queue. These tools "
                 "cannot create an application that is not on the queue, choose an App#, "
-                "or rewrite the queue."
+                "approve a lead, or rewrite the queue."
             ),
         )
         for _tool in (get_to_apply_queue, list_applied_index, list_applications):
@@ -2250,6 +2481,35 @@ if FastMCP is not None and MCP_TOKEN:
             {"error": "404: ..."} if the row doesn't exist."""
             try:
                 return _submit_agent_update_row(to_apply_id, fill_note, skip)
+            except HTTPException as e:
+                return _http_err(e)
+
+        @submit_mcp.tool(name="propose_job_lead", annotations={**_WR, "idempotentHint": False})
+        def submit_propose_job_lead(
+            apply_url: str,
+            company: Optional[str] = None,
+            role: Optional[str] = None,
+            location: Optional[str] = None,
+            found_via: str = "other",
+            note: Optional[str] = None,
+        ) -> dict:
+            """PROPOSE a job posting you found yourself (an email, a link) for the
+            On Deck queue. This does NOT queue it: a sourcing session reviews it,
+            re-checks it at the source, and if it passes it shows up in
+            get_to_apply_queue on a later day — only then apply to it. `apply_url` is
+            the FINAL https posting URL (open the link and follow redirects first; no
+            tracking / login links). `found_via` = 'email', 'linkedin', 'referral' or
+            'other'. `note` is one short line (max 300 chars). Returns the lead
+            {id, status: 'proposed', ...}. {"error": "409: ..."} means it is already
+            known — as a lead (with its status and review note), an application, or a
+            queue row; move on. {"error": "429: ..."} means the daily cap (30) is
+            reached."""
+            try:
+                body = LeadIn(
+                    applyUrl=apply_url, company=company, role=role, location=location,
+                    foundVia=found_via, note=note,
+                )
+                return _propose_lead(body)
             except HTTPException as e:
                 return _http_err(e)
 

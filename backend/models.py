@@ -114,6 +114,31 @@ class ToApply(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class JobLead(Base):
+    """A job posting the SUBMIT agent found on its own (email, a link) and PROPOSES
+    for the queue. Kept apart from to_apply on purpose: the queue stays single-writer
+    (sourcing), and a lead can never be applied to before it is reviewed. The
+    sourcing session re-checks the posting at its source, queues it with
+    put_to_apply_queue, then marks the lead accepted (or rejects it with a reason).
+    company / role / location / note are the proposer's words — untrusted hints;
+    only apply_url is the lead's identity. A reviewed lead is final."""
+
+    __tablename__ = "job_leads"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    apply_url = Column(Text, nullable=False, unique=True)  # stored after cleanup
+    company = Column(String(200))
+    role = Column(String(200))
+    location = Column(String(200))
+    found_via = Column(String(30))  # email | linkedin | referral | other
+    note = Column(Text)  # one line, <= 300 chars
+    status = Column(String(20), server_default="proposed", nullable=False)  # proposed | accepted | rejected
+    review_note = Column(Text)  # required when rejected
+    queue_date = Column(Date)  # set on accept: the day it was queued
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    reviewed_at = Column(DateTime(timezone=True))
+
+
 class LeetcodeProblem(Base):
     __tablename__ = "leetcode_problems"
 
