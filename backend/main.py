@@ -165,6 +165,18 @@ async def lifespan(_app: FastAPI):
                 conn.execute(text("ALTER TABLE to_apply ADD COLUMN IF NOT EXISTS backup BOOLEAN NOT NULL DEFAULT false"))
         except Exception:
             pass
+        # Queue rows left queued although their URL already has an App# (written
+        # before _resolve_queued_rows existed). Idempotent.
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE to_apply SET status = 'applied' WHERE status = 'queued' AND apply_url IN "
+                        "(SELECT apply_url FROM applications WHERE apply_url IS NOT NULL)"
+                    )
+                )
+        except Exception:
+            pass
     # Starlette does NOT auto-run a mounted sub-app's lifespan, so when an MCP
     # server is mounted (bottom of file), nest its lifespan inside ours to start
     # and stop its Streamable-HTTP session manager with the app.
@@ -955,6 +967,10 @@ def _create_application(body: ApplicationCreate) -> dict:
         if apply_url:
             dup = session.execute(select(Application).where(Application.apply_url == apply_url)).scalar_one_or_none()
             if dup is not None:
+                # Already applied: still settle any row left queued for this URL
+                # (rows from before this rule existed), then report the dup.
+                _resolve_queued_rows(session, apply_url)
+                session.commit()
                 raise HTTPException(
                     status_code=409,
                     detail={"error": "duplicate", "existingAppNum": dup.app_num, "applyUrl": apply_url},
@@ -985,6 +1001,7 @@ def _create_application(body: ApplicationCreate) -> dict:
         )
         if queue_row is not None:
             queue_row.status = "applied"
+        _resolve_queued_rows(session, apply_url)
         _shadow(session, "application", str(row.app_num), "put", _serialize_app(row))
         session.commit()
         session.refresh(row)
@@ -1072,7 +1089,34 @@ class ToApplyPatch(BaseModel):
     note: Optional[str] = None
 
 
-def _serialize_to_apply(r: ToApply, company_name: Optional[str]) -> dict:
+def _app_nums_by_url(session, urls) -> dict:
+    """apply_url → App# for the urls that already have an application. A queue row
+    is "the same job" as an application exactly when the URLs match (R8)."""
+    urls = {u for u in urls if u}
+    if not urls:
+        return {}
+    return dict(
+        session.execute(
+            select(Application.apply_url, Application.app_num).where(Application.apply_url.in_(urls))
+        ).all()
+    )
+
+
+def _resolve_queued_rows(session, apply_url: Optional[str]) -> None:
+    """Once a URL has an App#, every still-queued row carrying that URL — on any
+    queue day — is applied too. Without this, a job promoted from yesterday's row
+    still shows as unapplied on today's queue (Rokt, App#442 vs row 1913)."""
+    if not apply_url:
+        return
+    rows = session.execute(
+        select(ToApply).where(ToApply.apply_url == apply_url, ToApply.status == "queued")
+    ).scalars().all()
+    for row in rows:
+        row.status = "applied"
+        _shadow(session, "to_apply", str(row.id), "patch", _serialize_to_apply(row, None))
+
+
+def _serialize_to_apply(r: ToApply, company_name: Optional[str], app_num: Optional[int] = None) -> dict:
     return {
         "id": r.id,
         "queueDate": r.queue_date.isoformat() if r.queue_date else None,
@@ -1087,6 +1131,7 @@ def _serialize_to_apply(r: ToApply, company_name: Optional[str]) -> dict:
         "fresh": bool(r.fresh),
         "backup": bool(r.backup),
         "status": r.status,
+        "appNum": app_num,  # the application this row's URL became, if any
         "createdAt": r.created_at.isoformat() if r.created_at else None,
     }
 
@@ -1114,7 +1159,11 @@ def to_apply_get(date: Optional[str] = None):
             .where(ToApply.queue_date == qd)
             .order_by(ToApply.id)
         ).all()
-        return {"queueDate": qd.isoformat(), "rows": [_serialize_to_apply(r, name) for r, name in rows]}
+        app_nums = _app_nums_by_url(session, (r.apply_url for r, _ in rows))
+        return {
+            "queueDate": qd.isoformat(),
+            "rows": [_serialize_to_apply(r, name, app_nums.get(r.apply_url)) for r, name in rows],
+        }
 
 
 @app.put("/api/to_apply", dependencies=[Depends(require_admin)])
@@ -1122,11 +1171,13 @@ def to_apply_put(body: ToApplyPut):
     """The sourcing run writes the day's queue. Upsert by (queueDate, applyUrl):
     existing rows keep their STATUS (a tick made in Bridge survives a re-run);
     queued rows absent from the payload are deleted (the job closed); rows already
-    applied/skipped are never deleted."""
+    applied/skipped are never deleted. A row whose URL already has an App# is written
+    as applied, never queued — the job was applied to from an earlier day's row."""
     if SessionLocal is None:
         raise HTTPException(status_code=503, detail="db unavailable")
     with SessionLocal() as session:
         seen, inserted, updated = set(), 0, 0
+        applied_urls = _app_nums_by_url(session, (r.apply_url.strip() for r in body.rows))
         for r in body.rows:
             url = r.apply_url.strip()
             if not url or url in seen:
@@ -1142,6 +1193,8 @@ def to_apply_put(body: ToApplyPut):
                 inserted += 1
             else:
                 updated += 1
+            if url in applied_urls and row.status == "queued":
+                row.status = "applied"
             row.company_id = company.id if company else None
             row.role, row.location, row.resume = r.role, r.location, r.resume
             # r.note is the sourcing note; keep what the submit agent logged on the row.
@@ -1200,7 +1253,7 @@ def _submit_agent_update_row(row_id: int, fill_note: Optional[str], skip: bool) 
         _shadow(session, "to_apply", str(row_id), "patch", _serialize_to_apply(row, name))
         session.commit()
         session.refresh(row)
-        return _serialize_to_apply(row, name)
+        return _serialize_to_apply(row, name, _app_nums_by_url(session, [row.apply_url]).get(row.apply_url))
 
 
 @app.patch("/api/to_apply/{row_id}", dependencies=[Depends(require_daily_writer)])
@@ -1225,7 +1278,7 @@ def to_apply_patch(row_id: int, body: ToApplyPatch):
         _shadow(session, "to_apply", str(row_id), "patch", snap)
         session.commit()
         session.refresh(row)
-        return _serialize_to_apply(row, name)
+        return _serialize_to_apply(row, name, _app_nums_by_url(session, [row.apply_url]).get(row.apply_url))
 
 
 class ToApplyApplyIn(BaseModel):
@@ -2129,8 +2182,10 @@ if FastMCP is not None and MCP_TOKEN:
     def get_to_apply_queue(date: Optional[str] = None) -> dict:
         """Read the On Deck queue (the `to_apply` table): {queueDate, rows:[{id,
         company, role, location, applyUrl, resume, note, reach, fresh, backup,
-        status}]}. `date` is 'YYYY-MM-DD'; omit it for the newest queue day. Rows with
-        status 'applied' / 'skipped' were already handled by the operator."""
+        status, appNum}]}. `date` is 'YYYY-MM-DD'; omit it for the newest queue day. Rows
+        with status 'applied' / 'skipped' were already handled. `appNum` is set when the
+        row's applyUrl already has an application — possibly applied from an earlier
+        day's row; never submit such a row again."""
         try:
             return to_apply_get(date)
         except HTTPException as e:
