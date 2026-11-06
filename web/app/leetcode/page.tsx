@@ -21,6 +21,23 @@ async function getLeetcodeData(): Promise<LeetcodeContent | null> {
   return fetchJsonWithRetry<LeetcodeContent>(`${base}/api/leetcode`);
 }
 
+/** Entry to the static interview-prep plan (/leetcode/google-plan). Shown in both
+ *  states because the plan doesn't depend on the backend. */
+function PlanLink() {
+  return (
+    <Link
+      href="/leetcode/google-plan"
+      className="group mb-6 flex items-center justify-between rounded-xl border border-neutral-200 px-5 py-3 transition-colors hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600"
+    >
+      <span>
+        <span className="block font-semibold">Google Round 1 Plan</span>
+        <span className="block text-sm text-neutral-500">14-day interview prep · topics + problems</span>
+      </span>
+      <span className="text-neutral-400 transition-transform group-hover:translate-x-0.5">&rarr;</span>
+    </Link>
+  );
+}
+
 export default async function LeetCodePage() {
   const data = await getLeetcodeData();
 
@@ -34,6 +51,9 @@ export default async function LeetCodePage() {
           &larr; Learning Progress
         </Link>
         <h1 className="mt-6 text-3xl font-bold sm:text-4xl">LeetCode</h1>
+        <div className="mt-6">
+          <PlanLink />
+        </div>
         <DataError label="the LeetCode problems" />
       </main>
     );
@@ -59,6 +79,8 @@ export default async function LeetCodePage() {
           &middot; {problems.length} solved
         </p>
       </div>
+
+      <PlanLink />
 
       <LeetCodeExplorer problems={problems} />
     </main>
