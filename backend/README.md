@@ -39,3 +39,23 @@ cd backend && source .venv/bin/activate
 DATABASE_URL='...' uvicorn main:app --reload
 # http://localhost:8000/health
 ```
+
+## Tests
+
+Needs Python >= 3.10 (fastmcp). The tests point `DATABASE_URL` at a throwaway
+SQLite file before the app loads, so they never touch Neon even though `.env`
+holds the real URL.
+
+```bash
+cd backend
+pip install -r requirements.txt pytest httpx
+python -m pytest tests -q
+```
+
+## Job leads
+
+The submit agent can **propose** a posting it found (`propose_job_lead`, submit
+connector). Only a sourcing session can **review** it (`list_job_leads`,
+`review_job_lead`, main connector; or `GET`/`PATCH /api/leads` with the master
+secret). Accepting does not write the queue: queue the job with
+`put_to_apply_queue` first, then mark the lead accepted. Max 30 new leads per 24h.
